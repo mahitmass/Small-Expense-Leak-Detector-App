@@ -1,10 +1,10 @@
 /* src/features/ai/AIAssistant.jsx */
 import React, { useState, useRef, useEffect } from 'react';
-import { Bot, X, Send, Sparkles, TrendingDown, CreditCard } from 'lucide-react';
+import { Bot, X, Sparkles} from 'lucide-react';
 import { useExpenses } from '../../context/ExpenseContext';
 
 const AIAssistant = () => {
-  const { expenses, insights } = useExpenses();
+  const { expenses } = useExpenses();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     { role: 'ai', text: "Hi! I'm your Leak Detector AI. Ask me anything about your spending!" }

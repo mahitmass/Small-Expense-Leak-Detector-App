@@ -1,6 +1,6 @@
 /* src/features/transactions/SubscriptionView.jsx */
 import React from 'react';
-import { CreditCard, Trash2, TrendingUp, AlertTriangle } from 'lucide-react';
+import { CreditCard, TrendingUp, AlertTriangle } from 'lucide-react';
 
 const SubscriptionView = ({ expenses }) => {
   const subs = expenses.filter(e => e.category === 'subscription');
