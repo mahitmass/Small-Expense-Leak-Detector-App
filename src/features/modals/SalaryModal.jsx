@@ -1,5 +1,5 @@
 /* src/features/modals/SalaryModal.jsx */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Wallet, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
 
 const SalaryModal = ({ isOpen, onSubmit }) => {
