@@ -103,11 +103,13 @@ function determinePersonality(totals, totalLeak) {
 // 3. THE SMART INSIGHT ENGINE (ALL RULES)
 // ==========================================
 
-export function generateSmartInsights(expenses, categoryTotals) {
+export const generateSmartInsights = (expenses, categoryTotals) => {
   const insights = [];
 
   // Calculate Strictly Wasted Money
   let strictlyWasted = 0;
+  // Make sure LEAK_CATEGORIES is imported/available at the top of this file!
+  const LEAK_CATEGORIES = ["food", "subscription", "shopping", "transport", "entertainment", "snacks"];
   LEAK_CATEGORIES.forEach(cat => {
     strictlyWasted += (categoryTotals[cat] || 0);
   });
@@ -208,18 +210,45 @@ export function generateSmartInsights(expenses, categoryTotals) {
     });
   }
 
-  // RULE 8: SUBSCRIPTION TRAP
+  // RULE 8: UPGRADED SUBSCRIPTION AUDIT (From Competitor Notes)
   const subs = expenses.filter(e => e.category === 'subscription');
-  if (subs.length > 2) {
+  if (subs.length > 0) {
+    const expensiveSub = subs.sort((a,b) => b.amount - a.amount)[0];
     insights.push({
-      id: 'sub-trap',
-      type: 'alert',
-      title: 'Subscription Creep',
-      message: `You have ${subs.length} active subscriptions.`,
-      tip: "Audit: Cancel any service you haven't opened in the last 7 days.",
+      id: 'sub-check',
+      type: 'opportunity',
+      title: 'Subscription Usage Audit',
+      message: `You're paying ₹${expensiveSub.amount} for ${expensiveSub.description}. Are you still using this enough to justify the cost?`,
+      tip: "Cancel it for one month. If you miss it, resubscribe. You could save ₹" + (expensiveSub.amount * 12) + " a year.",
       severity: 'medium'
     });
   }
 
+  // RULE 9: MARKETPLACE BLURRINESS (Amazon, Blinkit)
+  const marketplaces = expenses.filter(e => ['amazon', 'blinkit', 'flipkart', 'zepto'].some(m => e.description.toLowerCase().includes(m)));
+  if (marketplaces.length > 0) {
+    const totalMarketplace = marketplaces.reduce((sum, e) => sum + e.amount, 0);
+    insights.push({
+      id: 'marketplace-split',
+      type: 'wealth',
+      title: 'Uncategorized Bulk Orders',
+      message: `You spent ₹${totalMarketplace} on platforms like Amazon/Blinkit. This could be groceries, electronics, or wants.`,
+      tip: "Tap on these transactions to split them into detailed categories to see your true Leak Score.",
+      severity: 'low'
+    });
+  }
+
+  // RULE 10: CREDIT CARD OPTIMIZATION (Indian Market specific)
+  if ((categoryTotals.food || 0) > 1000 || (categoryTotals.shopping || 0) > 2000) {
+    insights.push({
+      id: 'card-rewards',
+      type: 'eco', 
+      title: 'Maximize Your Rewards',
+      message: 'Based on your heavy food and shopping spending, you are leaving cashback on the table.',
+      tip: "Link an SBI Cashback or HDFC Swiggy card. You could be saving 5% automatically on these categories.",
+      severity: 'low'
+    });
+  }
+
   return insights;
-}
+};

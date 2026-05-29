@@ -1,5 +1,6 @@
 /* src/App.js */
 import React from 'react';
+import AIAssistant from './features/ai/AIAssistant';
 
 // Layout & Context
 import Header from './components/Header';
@@ -60,6 +61,8 @@ function App() {
       <main className="max-w-7xl mx-auto pb-20">
         {renderTabContent()}
       </main>
+      {/* The New AI Feature */}
+      <AIAssistant />
     </div>
   );
 }
