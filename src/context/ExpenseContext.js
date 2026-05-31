@@ -1,12 +1,11 @@
 /* src/context/ExpenseContext.js */
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { INITIAL_EXPENSES } from '../utils/constants';
+import React, { createContext, useContext, useState } from 'react';
 import { categorizeTransaction, calculateLeakAnalysis, generateSmartInsights } from '../utils/leakLogic';
 
 const ExpenseContext = createContext();
 
 export function ExpenseProvider({ children }) {
-  const [expenses, setExpenses] = useState([]);
+  const [expenses, setExpenses] = useState([]); // Starts 100% empty
   const [insights, setInsights] = useState([]);
   const [leakScore, setLeakScore] = useState(0);
   const [monthlyIncome, setMonthlyIncome] = useState(0);
@@ -15,9 +14,7 @@ export function ExpenseProvider({ children }) {
   const [showSalaryModal, setShowSalaryModal] = useState(true);
   const [showSMSModal, setShowSMSModal] = useState(false);
 
-  useEffect(() => {
-    setExpenses(INITIAL_EXPENSES);
-  }, []);
+  // We removed the useEffect that loaded INITIAL_EXPENSES!
 
   const runAnalysis = (currentExpenses, income) => {
     const safeIncome = income || monthlyIncome;
@@ -37,7 +34,8 @@ export function ExpenseProvider({ children }) {
     setMonthlyIncome(income);
     setShowSalaryModal(false);
     setTimeout(() => setShowSMSModal(true), 500);
-    runAnalysis(INITIAL_EXPENSES, income);
+    // Analyze with empty expenses initially
+    runAnalysis(expenses, income);
   };
 
   const handleAddExpense = (newExpense) => {
@@ -57,17 +55,9 @@ export function ExpenseProvider({ children }) {
 
   const handleAllowSMS = () => {
     setShowSMSModal(false);
-    setTimeout(() => {
-      const smsData = [
-        { id: 901, amount: 499, category: 'subscription', description: 'Netflix Auto-Debit', date: '2024-01-20', time: 'morning' },
-        { id: 902, amount: 269, category: 'food', description: 'Zomato Order #221', date: '2024-01-19', time: 'night' },
-        { id: 903, amount: 40, category: 'snacks', description: 'Chai Point', date: '2024-01-19', time: 'evening' },
-      ];
-      const merged = [...smsData, ...expenses];
-      setExpenses(merged);
-      runAnalysis(merged, monthlyIncome);
-      alert("✅ SMS Data Synced");
-    }, 800);
+    // We deleted the fake smsData here! 
+    // Now, this just closes the modal. The actual scanning is triggered 
+    // by your handleNativeAllow function inside App.js
   };
 
   return (

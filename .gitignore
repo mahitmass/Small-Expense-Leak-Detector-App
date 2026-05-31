@@ -9,6 +9,17 @@
 # Production
 /build
 
+# Capacitor Android & Gradle Build Artifacts to Ignore
+android/app/build/
+android/.gradle/
+android/local.properties
+android/captures/
+android/.idea/
+android/app/app.iml
+android/android.iml
+.gradle/
+capacitor.config.json.timestamp-*
+
 # Misc
 .DS_Store
 .env.local

@@ -55,7 +55,7 @@ const Header = () => {
 
             {/* Notification Dropdown */}
             {showNotifs && (
-              <div className="absolute right-0 mt-2 w-80 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl z-[150] overflow-hidden">
+              <div className="absolute right-0 mt-2 w-[90vw] sm:w-80 max-w-[320px] origin-top-right bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl z-[150] overflow-hidden">
                 <div className="p-3 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
                   <span className="font-bold text-white text-sm">Smart Alerts</span>
                   <button onClick={() => setShowNotifs(false)}><X className="w-4 h-4 text-slate-400" /></button>
