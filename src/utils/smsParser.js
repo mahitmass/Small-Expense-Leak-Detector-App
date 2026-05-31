@@ -14,6 +14,7 @@ export const parseBankSMS = (messageBody) => {
   const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : 0;
 
   // 4. Extract the Merchant / Person (Matches "UPI/DR/123/RAJAT GUPTA/...")
+  // eslint-disable-next-line no-useless-escape
   const upiMatch = messageBody.match(/UPI\/(?:DR|CR|P2A)\/[^\/]+\/([^\/]+)/i);
   let merchant = upiMatch ? upiMatch[1] : 'Unknown Vendor';
 

@@ -86,6 +86,7 @@ function App() {
     if (!showSMSModal && !showSalaryModal) {
       scanInboxHistory();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showSMSModal, showSalaryModal]);
 
   const renderTabContent = () => {
