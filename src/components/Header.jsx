@@ -38,7 +38,7 @@ const Header = () => {
         </div>
 
         {/* Action Bar */}
-        <div className="flex items-center gap-4 w-full md:w-auto">
+        <div className="flex items-center justify-end gap-4 w-full md:w-auto">
           {/* Notifications */}
           <div className="relative">
             <button 
@@ -55,7 +55,7 @@ const Header = () => {
 
             {/* Notification Dropdown */}
             {showNotifs && (
-              <div className="absolute -right-12 md:right-0 mt-3 w-72 sm:w-80 origin-top-right bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl z-[150] overflow-hidden">
+              <div className="absolute right-0 mt-3 w-[90vw] max-w-[320px] origin-top-right bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl z-[150] overflow-hidden">
                 <div className="p-3 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
                   <span className="font-bold text-white text-sm">Smart Alerts</span>
                   <button onClick={() => setShowNotifs(false)}><X className="w-4 h-4 text-slate-400" /></button>
