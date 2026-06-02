@@ -1,137 +1,172 @@
 /* src/App.js */
-import React, { useEffect } from 'react';
-import AIAssistant from './features/ai/AIAssistant';
-
-// Layout & Context
+import React, { useEffect, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import Header from './components/Header';
-import { useExpenses } from './context/ExpenseContext';
-
-// Native SMS Parser Engine
-import { parseBankSMS } from './utils/smsParser';
-
-// Features
 import Dashboard from './features/dashboard/Dashboard';
 import ExpenseList from './features/transactions/ExpenseList';
+import SubscriptionView from './features/transactions/SubscriptionView';
 import PatternsView from './features/transactions/PatternsView';
-import SubscriptionView from './features/transactions/SubscriptionView'; 
-import SMSPermissionModal from './features/modals/SMSPermissionModal';
-import SalaryModal from './features/modals/SalaryModal';
+import { useExpenses } from './context/ExpenseContext';
+import { parseBankSMS } from './utils/smsParser';
 
 function App() {
-  const {
-    expenses, activeTab,
-    showSalaryModal, showSMSModal, setShowSMSModal,
-    handleSalarySubmit, handleDeleteExpense, handleAllowSMS,
-    handleAddExpense // Pull this in so we can save scanned transactions
+  const { 
+    showSalaryModal, 
+    activeTab, 
+    handleAddExpense,
+    expenses,
+    handleSalarySubmit
   } = useExpenses();
+  
+  const [inputIncome, setInputIncome] = useState('50000');
+  
+  // 🔥 NEW GATEKEEPER STATES
+  const [isBooting, setIsBooting] = useState(true);
+  const [bootMessage, setBootMessage] = useState("Initializing Engine...");
 
-  // Native Automation: Scans the last 100 SMS messages on the device
-  const scanInboxHistory = () => {
-    if (window.SMS) {
-      // 1. Check for permission first
-      window.SMS.hasPermission((hasPermission) => {
-        if (hasPermission) {
-          fetchMessages();
+  // 🔥 NO MORE USEEFFECT AUTO-BOOT. We wait for the user to click the button.
+  
+  const triggerManualSync = () => {
+    if (Capacitor.isNativePlatform()) {
+      setBootMessage("Accessing Native Inbox...");
+      
+      // The original reader plugin injects as window.SMS
+      const smsEngine = window.SMS || (window.cordova && window.cordova.plugins && window.cordova.plugins.sms);
+
+      if (smsEngine) {
+        // 🔥 Make absolutely sure the reader function exists before calling it
+        if (typeof smsEngine.listSMS === 'function') {
+          fetchNativeMessages(smsEngine);
         } else {
-          // 2. Request permission natively (Triggers the Android popup)
-          window.SMS.requestPermission(() => {
-            console.log("SMS Permission Granted!");
-            fetchMessages();
-          }, (err) => {
-            console.error("SMS Permission Denied by User", err);
-          });
+          setBootMessage("🚨 PLUGIN ERROR: listSMS function is still missing.");
         }
-      }, (err) => console.error("Permission check failed", err));
+      } else {
+        setBootMessage("🚨 NATIVE ERROR: Bridge missing.");
+      }
     } else {
-      console.log("Running in Browser mode - Native SMS inbox tracking disabled.");
+      setBootMessage("💻 Web Mode: Simulating Sync...");
+      simulateWebSync();
     }
   };
 
-  // 3. The actual fetching logic separated out
-  const fetchMessages = () => {
-    const filter = { box: 'inbox', maxCount: 100 };
-    window.SMS.listSMS(filter, (messages) => {
-      console.log(`Successfully pulled ${messages.length} SMS items.`);
+  const fetchNativeMessages = (smsEngine) => {
+    setBootMessage("Syncing Secure Inbox...");
+    const filter = { box: 'inbox', maxCount: 200 }; 
+    
+    smsEngine.listSMS(filter, (messages) => {
+      let addedCount = 0;
+      
       messages.forEach((msg) => {
-        const parsedTransaction = parseBankSMS(msg.body);
+        const parsedTransaction = parseBankSMS(msg.body); 
+        
         if (parsedTransaction && parsedTransaction.type === 'debit') {
           const isDuplicate = expenses.some(
-            e => e.amount === parsedTransaction.amount && 
-                 e.description === parsedTransaction.merchant
+            e => e.amount === parsedTransaction.amount && e.description === parsedTransaction.merchant
           );
+          
           if (!isDuplicate) {
             handleAddExpense({
               description: parsedTransaction.merchant,
               amount: parsedTransaction.amount,
-              category: 'shopping', 
-              date: parsedTransaction.date.split('T')[0],
-              time: 'day'
+              category: parsedTransaction.merchant.toLowerCase().includes('upi') ? 'transfer' : 'shopping', 
+              date: parsedTransaction.date ? parsedTransaction.date.split('T')[0] : new Date().toISOString().split('T')[0],
+              time: 'day',
+              isContactPayment: parsedTransaction.merchant.toLowerCase().includes('upi')
             });
+            addedCount++;
           }
         }
       });
-    }, (err) => console.error("Failed to list SMS:", err));
+      
+      // 🔥 DATA IS LOADED. UNLOCK THE APP UI!
+      console.log(`Synced ${addedCount} transactions.`);
+      setIsBooting(false); 
+      
+    }, (err) => {
+      setBootMessage("🚨 Failed to read inbox.");
+      console.error(err);
+    });
   };
 
-  // Intercept the permission click to trigger the scanner immediately
-  const handleNativeAllow = () => {
-    handleAllowSMS(); // Fires your original context handler
+  const simulateWebSync = () => {
     setTimeout(() => {
-      scanInboxHistory(); // Runs the initialization scan
-    }, 1600); // Wait for your modal's premium loading animation to finish!
+      handleAddExpense({ description: 'Amazon Order', amount: 899, category: 'shopping', date: '2024-06-01', isContactPayment: false });
+      handleAddExpense({ description: 'UPI to Rahul', amount: 450, category: 'transfer', date: '2024-06-01', isContactPayment: true });
+      setIsBooting(false); // Unlock UI
+    }, 1500);
   };
-
-  // Automatically scan on app launch if the modal is already cleared/authorized
-  useEffect(() => {
-    if (!showSMSModal && !showSalaryModal) {
-      scanInboxHistory();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showSMSModal, showSalaryModal]);
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'dashboard':
-        return <Dashboard />;
-      case 'expenses':
-        return (
+      case 'dashboard': return <Dashboard />;
+      case 'expenses': return (
           <div className="bg-slate-800 rounded-xl border border-slate-700 p-4 shadow-xl">
-            <ExpenseList expenses={expenses} onDelete={handleDeleteExpense} />
+            <h2 className="text-xl font-bold text-white mb-4">All Transactions</h2>
+            <ExpenseList expenses={expenses} />
           </div>
         );
-      case 'subscriptions':
-        return <SubscriptionView expenses={expenses} />;
-      case 'patterns':
-        return <PatternsView expenses={expenses} />;
-      default: return null;
+      case 'subscriptions': return <SubscriptionView expenses={expenses} />;
+      case 'patterns': return <PatternsView expenses={expenses} />;
+      default: return <Dashboard />;
     }
   };
 
-  return (
-    <div className="min-h-screen bg-slate-900 text-slate-200 p-4 md:p-6 font-sans">
-      {/* Background Glow */}
-      <div className="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-[100px]"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-[100px]"></div>
+  // 🔥 THE GATEKEEPER SCREEN
+  if (isBooting) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-center">
+        <h1 className="text-3xl font-black text-white mb-4">Mass Detector</h1>
+        <p className="text-slate-400 font-semibold mb-8">
+          Please click "Allow" on the Android system prompt, then click below to sync.
+        </p>
+        
+        <button 
+          onClick={triggerManualSync}
+          className="px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-white shadow-lg transition-all"
+        >
+          I have allowed it ➡️ Sync Now
+        </button>
+
+        <p className="text-blue-400 font-semibold mt-8 animate-pulse">{bootMessage}</p>
       </div>
+    );
+  }
 
-      {/* Modals */}
-      <SalaryModal isOpen={showSalaryModal} onSubmit={handleSalarySubmit} />
-      <SMSPermissionModal 
-        isOpen={showSMSModal}
-        onAllow={handleNativeAllow} // Uses our native wrapper hook
-        onDeny={() => setShowSMSModal(false)}
-      />
-
-      {/* Main UI */}
+  // --- NORMAL APP UI (Only shows after data is synced) ---
+  return (
+    <div className="min-h-screen bg-slate-900 font-sans text-slate-200 p-4 md:p-8 selection:bg-blue-500/30">
       <Header />
-      
-      <main className="max-w-7xl mx-auto pb-20">
+      <main className="max-w-7xl mx-auto relative z-10">
         {renderTabContent()}
       </main>
-      
-      {/* The New AI Feature */}
-      <AIAssistant />
+
+      {/* SALARY MODAL */}
+      {showSalaryModal && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+           <div className="bg-slate-800 p-6 rounded-2xl w-full max-w-md border border-slate-700 shadow-2xl">
+              <h2 className="text-2xl font-bold text-white mb-2">Welcome!</h2>
+              <p className="text-slate-400 mb-6">Enter your monthly income to start tracking leaks.</p>
+              
+              <div className="relative mb-6">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
+                <input 
+                  type="number"
+                  value={inputIncome}
+                  onChange={(e) => setInputIncome(e.target.value)}
+                  placeholder="e.g. 50000"
+                  className="w-full pl-9 pr-4 py-3 bg-slate-700/50 border border-slate-600 rounded-xl text-white font-semibold focus:outline-none focus:border-blue-500 transition-colors"
+                />
+              </div>
+
+              <button 
+                onClick={() => handleSalarySubmit(Number(inputIncome) || 0)} 
+                className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-white transition-colors shadow-lg shadow-blue-600/20"
+              >
+                Set Income
+              </button>
+           </div>
+        </div>
+      )}
     </div>
   );
 }

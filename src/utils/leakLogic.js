@@ -1,7 +1,7 @@
 /* src/utils/leakLogic.js */
 
 // ==========================================
-// 1. THE BRAIN: MERCHANT DATABASE
+// 1. THE BRAIN: EXPANDED MERCHANT DATABASE
 // ==========================================
 export const MERCHANT_CATEGORY_MAP = {
   // --- LEAKS (Wants) ---
@@ -11,14 +11,14 @@ export const MERCHANT_CATEGORY_MAP = {
   
   netflix: "subscription", spotify: "subscription", hotstar: "subscription",
   prime: "subscription", youtube: "subscription", apple: "subscription",
-  disney: "subscription", hulu: "subscription", sonyliv: "subscription",
+  disney: "subscription", hulu: "subscription", sonyliv: "subscription", chatgpt: "subscription",
   
   amazon: "shopping", flipkart: "shopping", myntra: "shopping", ajio: "shopping",
-  meesho: "shopping", nykaa: "shopping", zara: "shopping", blinkit: "shopping",
-  hnm: "shopping", uniqlo: "shopping", decathlon: "shopping",
+  meesho: "shopping", nykaa: "shopping", zara: "shopping", blinkit: "shopping", zepto: "shopping",
+  hnm: "shopping", uniqlo: "shopping", decathlon: "shopping", dmart: "shopping", croma: "shopping",
   
   uber: "transport", ola: "transport", rapido: "transport", makemytrip: "transport",
-  redbus: "transport", metro: "transport", flight: "transport",
+  redbus: "transport", metro: "transport", flight: "transport", irctc: "transport",
   
   steam: "entertainment", playstation: "entertainment", xbox: "entertainment", 
   bookmyshow: "entertainment", pvr: "entertainment", inox: "entertainment",
@@ -31,26 +31,38 @@ export const MERCHANT_CATEGORY_MAP = {
   school: "education", college: "education", university: "education", tuition: "education",
   
   bescom: "bills", electricity: "bills", water: "bills", gas: "bills", broadband: "bills",
-  airtel: "bills", jio: "bills", vi: "bills", rent: "bills",
+  airtel: "bills", jio: "bills", vi: "bills", rent: "bills", recharge: "bills",
   
   zerodha: "investment", groww: "investment", upstox: "investment", sip: "investment",
-  mutual: "investment", fund: "investment", ppf: "investment",
+  mutual: "investment", fund: "investment", ppf: "investment", indmoney: "investment",
   
   paytm: "misc", gpay: "misc", phonepe: "misc", upi: "misc"
 };
 
-// ✅ FIX: Exported this so other files can use it!
 export const LEAK_CATEGORIES = ["food", "subscription", "shopping", "transport", "entertainment", "snacks"];
 
 // ==========================================
-// 2. CORE FUNCTIONS
+// 2. CORE FUNCTIONS (Merged Logic)
 // ==========================================
 
 export function categorizeTransaction(description) {
+  if (!description) return 'misc';
+  
+  // Strips all spaces (e.g. "Z O M A T O" becomes "zomato")
   const text = description.toLowerCase().replace(/\s+/g, '');
+
+  // RULE A: Detect Personal UPI Transfers vs Company Payments
+  if (text.includes('upito') || text.includes('vpa:')) {
+    // Check if the UPI target happens to be a known business first
+    const isBusiness = Object.keys(MERCHANT_CATEGORY_MAP).some(merchant => text.includes(merchant));
+    if (!isBusiness) return 'transfer'; // It's a personal contact/friend
+  }
+
+  // RULE B: Standard Merchant Matching
   for (const [merchant, category] of Object.entries(MERCHANT_CATEGORY_MAP)) {
     if (text.includes(merchant)) return category;
   }
+  
   return 'misc';
 }
 
@@ -100,7 +112,7 @@ function determinePersonality(totals, totalLeak) {
 }
 
 // ==========================================
-// 3. THE SMART INSIGHT ENGINE (ALL RULES)
+// 3. THE SMART INSIGHT ENGINE (ALL 10 RULES PRESERVED)
 // ==========================================
 
 export const generateSmartInsights = (expenses, categoryTotals) => {
@@ -108,8 +120,6 @@ export const generateSmartInsights = (expenses, categoryTotals) => {
 
   // Calculate Strictly Wasted Money
   let strictlyWasted = 0;
-  // Make sure LEAK_CATEGORIES is imported/available at the top of this file!
-  const LEAK_CATEGORIES = ["food", "subscription", "shopping", "transport", "entertainment", "snacks"];
   LEAK_CATEGORIES.forEach(cat => {
     strictlyWasted += (categoryTotals[cat] || 0);
   });
@@ -210,7 +220,7 @@ export const generateSmartInsights = (expenses, categoryTotals) => {
     });
   }
 
-  // RULE 8: UPGRADED SUBSCRIPTION AUDIT (From Competitor Notes)
+  // RULE 8: UPGRADED SUBSCRIPTION AUDIT
   const subs = expenses.filter(e => e.category === 'subscription');
   if (subs.length > 0) {
     const expensiveSub = subs.sort((a,b) => b.amount - a.amount)[0];
@@ -238,7 +248,7 @@ export const generateSmartInsights = (expenses, categoryTotals) => {
     });
   }
 
-  // RULE 10: CREDIT CARD OPTIMIZATION (Indian Market specific)
+  // RULE 10: CREDIT CARD OPTIMIZATION
   if ((categoryTotals.food || 0) > 1000 || (categoryTotals.shopping || 0) > 2000) {
     insights.push({
       id: 'card-rewards',

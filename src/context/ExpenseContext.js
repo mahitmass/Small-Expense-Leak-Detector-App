@@ -12,9 +12,6 @@ export function ExpenseProvider({ children }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   
   const [showSalaryModal, setShowSalaryModal] = useState(true);
-  const [showSMSModal, setShowSMSModal] = useState(false);
-
-  // We removed the useEffect that loaded INITIAL_EXPENSES!
 
   const runAnalysis = (currentExpenses, income) => {
     const safeIncome = income || monthlyIncome;
@@ -33,7 +30,6 @@ export function ExpenseProvider({ children }) {
   const handleSalarySubmit = (income) => {
     setMonthlyIncome(income);
     setShowSalaryModal(false);
-    setTimeout(() => setShowSMSModal(true), 500);
     // Analyze with empty expenses initially
     runAnalysis(expenses, income);
   };
@@ -53,18 +49,11 @@ export function ExpenseProvider({ children }) {
     runAnalysis(updated, monthlyIncome);
   };
 
-  const handleAllowSMS = () => {
-    setShowSMSModal(false);
-    // We deleted the fake smsData here! 
-    // Now, this just closes the modal. The actual scanning is triggered 
-    // by your handleNativeAllow function inside App.js
-  };
-
   return (
     <ExpenseContext.Provider value={{
       expenses, insights, setInsights, leakScore, monthlyIncome, activeTab, setActiveTab,
-      showSalaryModal, setShowSalaryModal, showSMSModal, setShowSMSModal,
-      handleSalarySubmit, handleAddExpense, handleDeleteExpense, handleAllowSMS
+      showSalaryModal, setShowSalaryModal,
+      handleSalarySubmit, handleAddExpense, handleDeleteExpense
     }}>
       {children}
     </ExpenseContext.Provider>

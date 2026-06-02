@@ -7,7 +7,7 @@
     "@awesome-cordova-plugins/sms": "^9.2.0",
     "@capacitor/android": "^8.3.4",
     "@capacitor/core": "^8.3.4",
-    "cordova-plugin-sms-retriever": "^4.0.4",
+    "cordova-plugin-sms": "^1.0.5",
     "lucide-react": "^0.263.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -39,6 +39,7 @@
   "devDependencies": {
     "@capacitor/cli": "^8.3.4",
     "autoprefixer": "^10.4.14",
+    "jetifier": "^2.0.0",
     "postcss": "^8.4.21",
     "tailwindcss": "^3.3.0"
   }
