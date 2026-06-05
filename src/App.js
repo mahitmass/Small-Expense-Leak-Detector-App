@@ -10,10 +10,13 @@ import { useExpenses } from './context/ExpenseContext';
 import { parseBankSMS } from './utils/smsParser';
 
 function App() {
-  const { 
+  const{
     showSalaryModal, 
+    showSMSModal, 
+    setShowSMSModal,
     activeTab, 
     handleAddExpense,
+    handleAddMultipleExpenses, // 🔥 यहाँ नया फंक्शन इम्पोर्ट करो
     expenses,
     handleSalarySubmit
   } = useExpenses();
@@ -50,22 +53,23 @@ function App() {
   };
 
   const fetchNativeMessages = (smsEngine) => {
-    setBootMessage("Syncing Secure Inbox...");
     const filter = { box: 'inbox', maxCount: 200 }; 
     
     smsEngine.listSMS(filter, (messages) => {
       let addedCount = 0;
+      let bulkExpenses = []; // Collect all valid transactions here
       
       messages.forEach((msg) => {
         const parsedTransaction = parseBankSMS(msg.body); 
         
         if (parsedTransaction && parsedTransaction.type === 'debit') {
-          const isDuplicate = expenses.some(
-            e => e.amount === parsedTransaction.amount && e.description === parsedTransaction.merchant
-          );
+          // Check for duplicates in both the old state and the new incoming batch
+          const isDuplicateState = expenses.some(e => e.amount === parsedTransaction.amount && e.description === parsedTransaction.merchant && e.date === parsedTransaction.date);
+          const isDuplicateNew = bulkExpenses.some(e => e.amount === parsedTransaction.amount && e.description === parsedTransaction.merchant && e.date === parsedTransaction.date);
           
-          if (!isDuplicate) {
-            handleAddExpense({
+          if (!isDuplicateState && !isDuplicateNew) {
+            bulkExpenses.push({
+              id: Math.random().toString(36).substring(7),
               description: parsedTransaction.merchant,
               amount: parsedTransaction.amount,
               category: parsedTransaction.merchant.toLowerCase().includes('upi') ? 'transfer' : 'shopping', 
@@ -77,14 +81,27 @@ function App() {
           }
         }
       });
-      
-      // 🔥 DATA IS LOADED. UNLOCK THE APP UI!
-      console.log(`Synced ${addedCount} transactions.`);
-      setIsBooting(false); 
-      
+
+      // Send all new transactions to Context at once
+      if (bulkExpenses.length > 0) {
+        handleAddMultipleExpenses(bulkExpenses);
+      }
+
+      alert(`✅ Synced ${addedCount} new transactions from your inbox!`);
+
+      // 🔥 THE FIX: UNLOCK THE UI AND SHOW THE DASHBOARD!
+      // This hides the Blue Gatekeeper screen
+      if (typeof setIsBooting === 'function') {
+        setIsBooting(false); 
+      }
+      // This hides the Modal (if you are using the modal version)
+      if (typeof setShowSMSModal === 'function') {
+        setShowSMSModal(false);
+      }
+
     }, (err) => {
-      setBootMessage("🚨 Failed to read inbox.");
-      console.error(err);
+      console.error("Failed to list SMS:", err);
+      alert("Error reading SMS inbox.");
     });
   };
 

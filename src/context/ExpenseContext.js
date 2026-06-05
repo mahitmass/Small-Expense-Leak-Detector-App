@@ -5,7 +5,7 @@ import { categorizeTransaction, calculateLeakAnalysis, generateSmartInsights } f
 const ExpenseContext = createContext();
 
 export function ExpenseProvider({ children }) {
-  const [expenses, setExpenses] = useState([]); // Starts 100% empty
+  const [expenses, setExpenses] = useState([]); 
   const [insights, setInsights] = useState([]);
   const [leakScore, setLeakScore] = useState(0);
   const [monthlyIncome, setMonthlyIncome] = useState(0);
@@ -30,7 +30,6 @@ export function ExpenseProvider({ children }) {
   const handleSalarySubmit = (income) => {
     setMonthlyIncome(income);
     setShowSalaryModal(false);
-    // Analyze with empty expenses initially
     runAnalysis(expenses, income);
   };
 
@@ -39,6 +38,13 @@ export function ExpenseProvider({ children }) {
       newExpense.category = categorizeTransaction(newExpense.description);
     }
     const updated = [newExpense, ...expenses];
+    setExpenses(updated);
+    runAnalysis(updated, monthlyIncome);
+  };
+
+  // 🔥 नया फंक्शन: यह एक साथ 50+ ट्रांज़ैक्शन सेव करेगा बिना ओवरराइट किये!
+  const handleAddMultipleExpenses = (newExpensesArray) => {
+    const updated = [...newExpensesArray, ...expenses];
     setExpenses(updated);
     runAnalysis(updated, monthlyIncome);
   };
@@ -53,7 +59,9 @@ export function ExpenseProvider({ children }) {
     <ExpenseContext.Provider value={{
       expenses, insights, setInsights, leakScore, monthlyIncome, activeTab, setActiveTab,
       showSalaryModal, setShowSalaryModal,
-      handleSalarySubmit, handleAddExpense, handleDeleteExpense
+      handleSalarySubmit, handleAddExpense, 
+      handleAddMultipleExpenses, // इसे यहाँ एक्सपोर्ट करना ज़रूरी है
+      handleDeleteExpense
     }}>
       {children}
     </ExpenseContext.Provider>
