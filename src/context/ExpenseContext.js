@@ -1,73 +1,61 @@
 /* src/context/ExpenseContext.js */
-import React, { createContext, useContext, useState } from 'react';
-import { categorizeTransaction, calculateLeakAnalysis, generateSmartInsights } from '../utils/leakLogic';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { initializeDatabase, getDB } from '../utils/db';
 
 const ExpenseContext = createContext();
 
 export function ExpenseProvider({ children }) {
-  const [expenses, setExpenses] = useState([]); 
-  const [insights, setInsights] = useState([]);
-  const [leakScore, setLeakScore] = useState(0);
-  const [monthlyIncome, setMonthlyIncome] = useState(0);
-  const [activeTab, setActiveTab] = useState('dashboard');
-  
-  const [showSalaryModal, setShowSalaryModal] = useState(true);
+    const [expenses, setExpenses] = useState([]);
+    const [isDbReady, setIsDbReady] = useState(false);
 
-  const runAnalysis = (currentExpenses, income) => {
-    const safeIncome = income || monthlyIncome;
-    const { score } = calculateLeakAnalysis(currentExpenses, safeIncome);
-    setLeakScore(score);
+    useEffect(() => {
+        const setup = async () => {
+            const ready = await initializeDatabase();
+            setIsDbReady(ready);
+            if (ready) {
+                await loadExpensesFromDB();
+            }
+        };
+        setup();
+    }, []);
 
-    const totals = currentExpenses.reduce((acc, curr) => {
-      acc[curr.category] = (acc[curr.category] || 0) + curr.amount;
-      return acc;
-    }, {});
-    
-    const newInsights = generateSmartInsights(currentExpenses, totals);
-    setInsights(newInsights);
-  };
+    const loadExpensesFromDB = async () => {
+        const db = getDB();
+        if (!db) return;
+        
+        const result = await db.query(`SELECT * FROM transactions ORDER BY date DESC`);
+        if (result.values) {
+            setExpenses(result.values);
+        }
+    };
 
-  const handleSalarySubmit = (income) => {
-    setMonthlyIncome(income);
-    setShowSalaryModal(false);
-    runAnalysis(expenses, income);
-  };
+    const handleAddMultipleExpenses = async (parsedTransactionsArray) => {
+        const db = getDB();
+        if (!db || parsedTransactionsArray.length === 0) return;
 
-  const handleAddExpense = (newExpense) => {
-    if (!newExpense.category || newExpense.category === 'misc') {
-      newExpense.category = categorizeTransaction(newExpense.description);
-    }
-    const updated = [newExpense, ...expenses];
-    setExpenses(updated);
-    runAnalysis(updated, monthlyIncome);
-  };
+        let statements = [];
+        
+        parsedTransactionsArray.forEach((t) => {
+            const uniqueHash = `${t.date}_${t.amount}_${t.merchant.replace(/\s+/g, '')}`;
+            statements.push({
+                statement: `INSERT OR IGNORE INTO transactions (amount, merchant, date, category, type, unique_hash) VALUES (?, ?, ?, ?, ?, ?)`,
+                values: [t.amount, t.merchant, t.date, t.category || 'Unknown', t.type || 'debit', uniqueHash]
+            });
+        });
 
-  // 🔥 नया फंक्शन: यह एक साथ 50+ ट्रांज़ैक्शन सेव करेगा बिना ओवरराइट किये!
-  const handleAddMultipleExpenses = (newExpensesArray) => {
-    const updated = [...newExpensesArray, ...expenses];
-    setExpenses(updated);
-    runAnalysis(updated, monthlyIncome);
-  };
+        try {
+            await db.executeSet(statements);
+            await loadExpensesFromDB(); 
+        } catch (error) {
+            console.error("Batch SQLite write failed:", error);
+        }
+    };
 
-  const handleDeleteExpense = (id) => {
-    const updated = expenses.filter(expense => expense.id !== id);
-    setExpenses(updated);
-    runAnalysis(updated, monthlyIncome);
-  };
-
-  return (
-    <ExpenseContext.Provider value={{
-      expenses, insights, setInsights, leakScore, monthlyIncome, activeTab, setActiveTab,
-      showSalaryModal, setShowSalaryModal,
-      handleSalarySubmit, handleAddExpense, 
-      handleAddMultipleExpenses, // इसे यहाँ एक्सपोर्ट करना ज़रूरी है
-      handleDeleteExpense
-    }}>
-      {children}
-    </ExpenseContext.Provider>
-  );
+    return (
+        <ExpenseContext.Provider value={{ expenses, isDbReady, handleAddMultipleExpenses }}>
+            {children}
+        </ExpenseContext.Provider>
+    );
 }
 
-export function useExpenses() {
-  return useContext(ExpenseContext);
-}
+export const useExpenses = () => useContext(ExpenseContext);
