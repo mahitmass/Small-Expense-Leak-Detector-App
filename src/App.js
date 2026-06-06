@@ -8,36 +8,59 @@ import SubscriptionView from './features/transactions/SubscriptionView';
 import PatternsView from './features/transactions/PatternsView';
 import { useExpenses } from './context/ExpenseContext';
 import { parseBankSMS } from './utils/smsParser';
+import { initializeDatabase } from './utils/db'; 
+
+// 🔥 IMPORT THE CONTRIBUTOR'S AUTH CONTEXT AND SCREEN
+import { useAuth } from './context/AuthContext';
+import AuthScreen from './features/auth/AuthScreen';
 
 function App() {
-  const{
+  // 🔥 PULL IN AUTH STATE
+  const { currentUser, loading } = useAuth();
+
+  const {
     showSalaryModal, 
-    showSMSModal, 
     setShowSMSModal,
     activeTab, 
     handleAddExpense,
-    handleAddMultipleExpenses, // 🔥 यहाँ नया फंक्शन इम्पोर्ट करो
+    handleAddMultipleExpenses, 
     expenses,
     handleSalarySubmit
   } = useExpenses();
   
   const [inputIncome, setInputIncome] = useState('50000');
   
-  // 🔥 NEW GATEKEEPER STATES
+  // 🔥 STATE FOR THE SMART GATEKEEPER
+  const [isDbReady, setIsDbReady] = useState(false);
   const [isBooting, setIsBooting] = useState(true);
   const [bootMessage, setBootMessage] = useState("Initializing Engine...");
 
-  // 🔥 NO MORE USEEFFECT AUTO-BOOT. We wait for the user to click the button.
-  
+  // 🔥 THE SMART BRAIN: Boot DB & Check Sync Memory
+  useEffect(() => {
+    const setupDB = async () => {
+      const success = await initializeDatabase();
+      if (success) {
+        setIsDbReady(true);
+        
+        // Did we already sync the inbox in the past?
+        const hasSynced = localStorage.getItem("hasSyncedInbox");
+        if (hasSynced === "true") {
+          setIsBooting(false); // Skip the manual sync screen
+        }
+      } else {
+        console.error("Database failed to wake up!");
+        setBootMessage("🚨 Database Failed to Wake Up");
+      }
+    };
+    setupDB();
+  }, []);
+
   const triggerManualSync = () => {
     if (Capacitor.isNativePlatform()) {
       setBootMessage("Accessing Native Inbox...");
-      
-      // The original reader plugin injects as window.SMS
       const smsEngine = window.SMS || (window.cordova && window.cordova.plugins && window.cordova.plugins.sms);
 
       if (smsEngine) {
-        // 🔥 Make absolutely sure the reader function exists before calling it
         if (typeof smsEngine.listSMS === 'function') {
           fetchNativeMessages(smsEngine);
         } else {
@@ -57,13 +80,12 @@ function App() {
     
     smsEngine.listSMS(filter, (messages) => {
       let addedCount = 0;
-      let bulkExpenses = []; // Collect all valid transactions here
+      let bulkExpenses = []; 
       
       messages.forEach((msg) => {
         const parsedTransaction = parseBankSMS(msg.body); 
         
         if (parsedTransaction && parsedTransaction.type === 'debit') {
-          // Check for duplicates in both the old state and the new incoming batch
           const isDuplicateState = expenses.some(e => e.amount === parsedTransaction.amount && e.description === parsedTransaction.merchant && e.date === parsedTransaction.date);
           const isDuplicateNew = bulkExpenses.some(e => e.amount === parsedTransaction.amount && e.description === parsedTransaction.merchant && e.date === parsedTransaction.date);
           
@@ -82,19 +104,18 @@ function App() {
         }
       });
 
-      // Send all new transactions to Context at once
       if (bulkExpenses.length > 0) {
         handleAddMultipleExpenses(bulkExpenses);
       }
 
       alert(`✅ Synced ${addedCount} new transactions from your inbox!`);
 
-      // 🔥 THE FIX: UNLOCK THE UI AND SHOW THE DASHBOARD!
-      // This hides the Blue Gatekeeper screen
+      // 🔥 STAMP THE MEMORY: Tell the app never to show the Sync screen again
+      localStorage.setItem("hasSyncedInbox", "true");
+
       if (typeof setIsBooting === 'function') {
         setIsBooting(false); 
       }
-      // This hides the Modal (if you are using the modal version)
       if (typeof setShowSMSModal === 'function') {
         setShowSMSModal(false);
       }
@@ -109,7 +130,8 @@ function App() {
     setTimeout(() => {
       handleAddExpense({ description: 'Amazon Order', amount: 899, category: 'shopping', date: '2024-06-01', isContactPayment: false });
       handleAddExpense({ description: 'UPI to Rahul', amount: 450, category: 'transfer', date: '2024-06-01', isContactPayment: true });
-      setIsBooting(false); // Unlock UI
+      localStorage.setItem("hasSyncedInbox", "true");
+      setIsBooting(false); 
     }, 1500);
   };
 
@@ -128,20 +150,34 @@ function App() {
     }
   };
 
-  // 🔥 THE GATEKEEPER SCREEN
+  // 🔥 GATEKEEPER 1: Wait for SQLite to Boot Up
+  if (!isDbReady || loading) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-4">
+        <h1 className="text-2xl font-black mb-4 animate-pulse">Waking up SQLite & Security...</h1>
+      </div>
+    );
+  }
+
+  // 🔥 GATEKEEPER 2: If no one is logged in, block access and show the Vault UI
+  if (!currentUser) {
+    return <AuthScreen />;
+  }
+
+  // 🔥 GATEKEEPER 3: The Smart SMS Inbox Check (Only runs once!)
   if (isBooting) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-center">
         <h1 className="text-3xl font-black text-white mb-4">Mass Detector</h1>
         <p className="text-slate-400 font-semibold mb-8">
-          Please click "Allow" on the Android system prompt, then click below to sync.
+          Welcome to the vault, {currentUser.name}! Click below to sync your historical SMS data.
         </p>
         
         <button 
           onClick={triggerManualSync}
           className="px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-white shadow-lg transition-all"
         >
-          I have allowed it ➡️ Sync Now
+          I have allowed SMS ➡️ Sync Now
         </button>
 
         <p className="text-blue-400 font-semibold mt-8 animate-pulse">{bootMessage}</p>
@@ -149,7 +185,7 @@ function App() {
     );
   }
 
-  // --- NORMAL APP UI (Only shows after data is synced) ---
+  // --- NORMAL APP UI ---
   return (
     <div className="min-h-screen bg-slate-900 font-sans text-slate-200 p-4 md:p-8 selection:bg-blue-500/30">
       <Header />
@@ -161,7 +197,7 @@ function App() {
       {showSalaryModal && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
            <div className="bg-slate-800 p-6 rounded-2xl w-full max-w-md border border-slate-700 shadow-2xl">
-              <h2 className="text-2xl font-bold text-white mb-2">Welcome!</h2>
+              <h2 className="text-2xl font-bold text-white mb-2">Welcome, {currentUser.name}!</h2>
               <p className="text-slate-400 mb-6">Enter your monthly income to start tracking leaks.</p>
               
               <div className="relative mb-6">

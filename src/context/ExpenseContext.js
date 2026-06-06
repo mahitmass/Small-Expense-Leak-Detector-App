@@ -20,8 +20,10 @@ export function ExpenseProvider({ children }) {
       if (db) {
         try {
           const res = await db.query(`SELECT * FROM transactions ORDER BY date DESC`);
+          
+          let dbExpenses = [];
           if (res.values && res.values.length > 0) {
-            const loadedExpenses = res.values.map(row => ({
+            dbExpenses = res.values.map(row => ({
               id: row.id,
               amount: row.amount,
               description: row.merchant,
@@ -29,9 +31,11 @@ export function ExpenseProvider({ children }) {
               category: row.category,
               type: row.type
             }));
-            setExpenses(loadedExpenses);
-            runAnalysis(loadedExpenses, monthlyIncome);
           }
+
+          setExpenses(dbExpenses);
+          runAnalysis(dbExpenses, monthlyIncome);
+
         } catch (error) {
           console.error("❌ Failed to load from SQLite:", error);
         }
