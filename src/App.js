@@ -38,14 +38,20 @@ function App() {
   // 🔥 THE SMART BRAIN: Boot DB & Check Sync Memory
   useEffect(() => {
     const setupDB = async () => {
+      // 💻 WEB PLATFORM BYPASS: Prevent Vercel from hanging on native SQLite
+      if (Capacitor.getPlatform() === 'web') {
+        setIsDbReady(true);
+        setIsBooting(false); // Skips sync wall on web preview
+        return;
+      }
+
+      // 📱 NATIVE PLATFORM: Run real SQLite on Android
       const success = await initializeDatabase();
       if (success) {
         setIsDbReady(true);
-        
-        // Did we already sync the inbox in the past?
         const hasSynced = localStorage.getItem("hasSyncedInbox");
         if (hasSynced === "true") {
-          setIsBooting(false); // Skip the manual sync screen
+          setIsBooting(false); 
         }
       } else {
         console.error("Database failed to wake up!");
