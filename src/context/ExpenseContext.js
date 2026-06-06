@@ -1,61 +1,137 @@
 /* src/context/ExpenseContext.js */
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { initializeDatabase, getDB } from '../utils/db';
+import { categorizeTransaction, calculateLeakAnalysis, generateSmartInsights } from '../utils/leakLogic';
+import { getDB } from '../utils/db'; // 🔥 Importing the new SQLite database
 
 const ExpenseContext = createContext();
 
 export function ExpenseProvider({ children }) {
-    const [expenses, setExpenses] = useState([]);
-    const [isDbReady, setIsDbReady] = useState(false);
+  const [expenses, setExpenses] = useState([]); 
+  const [insights, setInsights] = useState([]);
+  const [leakScore, setLeakScore] = useState(0);
+  const [monthlyIncome, setMonthlyIncome] = useState(0);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [showSalaryModal, setShowSalaryModal] = useState(true);
 
-    useEffect(() => {
-        const setup = async () => {
-            const ready = await initializeDatabase();
-            setIsDbReady(ready);
-            if (ready) {
-                await loadExpensesFromDB();
-            }
-        };
-        setup();
-    }, []);
-
-    const loadExpensesFromDB = async () => {
-        const db = getDB();
-        if (!db) return;
-        
-        const result = await db.query(`SELECT * FROM transactions ORDER BY date DESC`);
-        if (result.values) {
-            setExpenses(result.values);
-        }
-    };
-
-    const handleAddMultipleExpenses = async (parsedTransactionsArray) => {
-        const db = getDB();
-        if (!db || parsedTransactionsArray.length === 0) return;
-
-        let statements = [];
-        
-        parsedTransactionsArray.forEach((t) => {
-            const uniqueHash = `${t.date}_${t.amount}_${t.merchant.replace(/\s+/g, '')}`;
-            statements.push({
-                statement: `INSERT OR IGNORE INTO transactions (amount, merchant, date, category, type, unique_hash) VALUES (?, ?, ?, ?, ?, ?)`,
-                values: [t.amount, t.merchant, t.date, t.category || 'Unknown', t.type || 'debit', uniqueHash]
-            });
-        });
-
+  // 🔥 INITIAL LOAD: Fetch data from SQLite when the app boots
+  useEffect(() => {
+    const loadData = async () => {
+      const db = getDB();
+      if (db) {
         try {
-            await db.executeSet(statements);
-            await loadExpensesFromDB(); 
+          const res = await db.query(`SELECT * FROM transactions ORDER BY date DESC`);
+          if (res.values && res.values.length > 0) {
+            const loadedExpenses = res.values.map(row => ({
+              id: row.id,
+              amount: row.amount,
+              description: row.merchant,
+              date: row.date,
+              category: row.category,
+              type: row.type
+            }));
+            setExpenses(loadedExpenses);
+            runAnalysis(loadedExpenses, monthlyIncome);
+          }
         } catch (error) {
-            console.error("Batch SQLite write failed:", error);
+          console.error("❌ Failed to load from SQLite:", error);
         }
+      }
     };
+    loadData();
+  }, [monthlyIncome]);
 
-    return (
-        <ExpenseContext.Provider value={{ expenses, isDbReady, handleAddMultipleExpenses }}>
-            {children}
-        </ExpenseContext.Provider>
-    );
+  const runAnalysis = (currentExpenses, income) => {
+    const safeIncome = income || monthlyIncome;
+    const { score } = calculateLeakAnalysis(currentExpenses, safeIncome);
+    setLeakScore(score);
+
+    const totals = currentExpenses.reduce((acc, curr) => {
+      acc[curr.category] = (acc[curr.category] || 0) + curr.amount;
+      return acc;
+    }, {});
+    
+    const newInsights = generateSmartInsights(currentExpenses, totals);
+    setInsights(newInsights);
+  };
+
+  const handleSalarySubmit = (income) => {
+    setMonthlyIncome(income);
+    setShowSalaryModal(false);
+    runAnalysis(expenses, income);
+  };
+
+  // 🔥 UPDATE: Save single expense to SQLite
+  const handleAddExpense = async (newExpense) => {
+    if (!newExpense.category || newExpense.category === 'misc') {
+      newExpense.category = categorizeTransaction(newExpense.description);
+    }
+    
+    const db = getDB();
+    if (db) {
+      try {
+        const query = `INSERT INTO transactions (amount, merchant, date, category, type, unique_hash) VALUES (?, ?, ?, ?, ?, ?)`;
+        const hash = `${newExpense.description}-${newExpense.amount}-${newExpense.date}`; // Basic unique hash
+        await db.run(query, [newExpense.amount, newExpense.description, newExpense.date, newExpense.category, 'debit', hash]);
+      } catch (err) {
+        console.error("SQLite Insert Error:", err);
+      }
+    }
+
+    const updated = [newExpense, ...expenses];
+    setExpenses(updated);
+    runAnalysis(updated, monthlyIncome);
+  };
+
+  // 🔥 UPDATE: Bulk save 50+ transactions to SQLite without overwriting!
+  const handleAddMultipleExpenses = async (newExpensesArray) => {
+    const db = getDB();
+    if (db) {
+      try {
+        // Run a loop to insert the massive batch safely into the database
+        for (const exp of newExpensesArray) {
+          const cat = (!exp.category || exp.category === 'misc') ? categorizeTransaction(exp.description) : exp.category;
+          const hash = `${exp.description}-${exp.amount}-${exp.date}-${Math.random()}`; // Prevent hash collisions
+          const query = `INSERT OR IGNORE INTO transactions (amount, merchant, date, category, type, unique_hash) VALUES (?, ?, ?, ?, ?, ?)`;
+          await db.run(query, [exp.amount, exp.description, exp.date, cat, 'debit', hash]);
+        }
+      } catch (err) {
+        console.error("SQLite Bulk Insert Error:", err);
+      }
+    }
+
+    const updated = [...newExpensesArray, ...expenses];
+    setExpenses(updated);
+    runAnalysis(updated, monthlyIncome);
+  };
+
+  const handleDeleteExpense = async (id) => {
+    const db = getDB();
+    if (db) {
+      try {
+        await db.run(`DELETE FROM transactions WHERE id = ?`, [id]);
+      } catch (err) {
+        console.error("SQLite Delete Error:", err);
+      }
+    }
+
+    const updated = expenses.filter(expense => expense.id !== id);
+    setExpenses(updated);
+    runAnalysis(updated, monthlyIncome);
+  };
+
+  return (
+    <ExpenseContext.Provider value={{
+      expenses, insights, setInsights, leakScore, monthlyIncome, activeTab, setActiveTab,
+      showSalaryModal, setShowSalaryModal,
+      handleSalarySubmit, handleAddExpense, 
+      handleAddMultipleExpenses,
+      handleDeleteExpense
+    }}>
+      {children}
+    </ExpenseContext.Provider>
+  );
 }
 
-export const useExpenses = () => useContext(ExpenseContext);
+export function useExpenses() {
+  return useContext(ExpenseContext);
+}
