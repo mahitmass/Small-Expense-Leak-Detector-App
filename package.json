@@ -5,6 +5,7 @@
   "homepage": ".",
   "dependencies": {
     "@awesome-cordova-plugins/sms": "^9.2.0",
+    "@capacitor-community/sqlite": "^8.1.0",
     "@capacitor/android": "^8.3.4",
     "@capacitor/core": "^8.3.4",
     "cordova-plugin-sms": "^1.0.5",
