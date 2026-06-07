@@ -1,6 +1,9 @@
 /* src/App.js */
-import { fetchDeviceContacts } from './utils/contacts';
 import React, { useEffect, useState } from 'react';
+import { Zap } from 'lucide-react';
+import { Home, List, RefreshCw, BarChart2, Users } from 'lucide-react'; // Added Users
+import { LocalNotifications } from '@capacitor/local-notifications'; // Added Notifications
+import FriendsView from './features/transactions/FriendsView'; // Added Component
 import { Capacitor } from '@capacitor/core';
 import Header from './components/Header';
 import Dashboard from './features/dashboard/Dashboard';
@@ -10,20 +13,20 @@ import PatternsView from './features/transactions/PatternsView';
 import { useExpenses } from './context/ExpenseContext';
 import { parseBankSMS } from './utils/smsParser';
 import { initializeDatabase } from './utils/db'; 
-
-// 🔥 IMPORT THE CONTRIBUTOR'S AUTH CONTEXT AND SCREEN
 import { useAuth } from './context/AuthContext';
 import AuthScreen from './features/auth/AuthScreen';
+import { fetchDeviceContacts } from './utils/contacts';
 
 function App() {
-  // 🔥 PULL IN AUTH STATE
   const { currentUser, loading } = useAuth();
   const [deviceContacts, setDeviceContacts] = useState([]);
 
+  // 🔥 ADDED setActiveTab HERE SO THE BOTTOM NAV WORKS
   const {
     showSalaryModal, 
     setShowSMSModal,
     activeTab, 
+    setActiveTab, 
     handleAddExpense,
     handleAddMultipleExpenses, 
     expenses,
@@ -31,23 +34,18 @@ function App() {
   } = useExpenses();
   
   const [inputIncome, setInputIncome] = useState('50000');
-  
-  // 🔥 STATE FOR THE SMART GATEKEEPER
   const [isDbReady, setIsDbReady] = useState(false);
   const [isBooting, setIsBooting] = useState(true);
   const [bootMessage, setBootMessage] = useState("Initializing Engine...");
 
-  // 🔥 THE SMART BRAIN: Boot DB & Check Sync Memory
   useEffect(() => {
     const setupDB = async () => {
-      // 💻 WEB PLATFORM BYPASS: Prevent Vercel from hanging on native SQLite
       if (Capacitor.getPlatform() === 'web') {
         setIsDbReady(true);
-        setIsBooting(false); // Skips sync wall on web preview
+        setIsBooting(false);
         return;
       }
 
-      // 📱 NATIVE PLATFORM: Run real SQLite on Android
       const success = await initializeDatabase();
       if (success) {
         setIsDbReady(true);
@@ -66,7 +64,6 @@ function App() {
   const triggerManualSync = async () => {
     if (Capacitor.isNativePlatform()) {
       setBootMessage("Syncing Contacts Library...");
-      // 🔥 Fetch native contacts and save to state
       const syncedContacts = await fetchDeviceContacts();
       setDeviceContacts(syncedContacts);
 
@@ -75,7 +72,7 @@ function App() {
 
       if (smsEngine) {
         if (typeof smsEngine.listSMS === 'function') {
-          fetchNativeMessages(smsEngine, syncedContacts); // Pass contacts to parser
+          fetchNativeMessages(smsEngine, syncedContacts); 
         } else {
           setBootMessage("🚨 PLUGIN ERROR: listSMS function is still missing.");
         }
@@ -88,7 +85,7 @@ function App() {
     }
   };
 
-  const fetchNativeMessages = (smsEngine) => {
+  const fetchNativeMessages = (smsEngine, syncedContacts) => {
     const filter = { box: 'inbox', maxCount: 200 }; 
     
     smsEngine.listSMS(filter, (messages) => {
@@ -119,19 +116,29 @@ function App() {
 
       if (bulkExpenses.length > 0) {
         handleAddMultipleExpenses(bulkExpenses);
+        
+        // 🔥 TRIGGER THE PUSH NOTIFICATION
+        LocalNotifications.schedule({
+          notifications: [
+            {
+              title: "Vault Synced",
+              body: `Detected ${addedCount} new transactions. Check your leak score.`,
+              id: Date.now(),
+              schedule: { at: new Date(Date.now() + 1000) }, // Trigger in 1 second
+              sound: null,
+              attachments: null,
+              actionTypeId: "",
+              extra: null
+            }
+          ]
+        });
       }
 
       alert(`✅ Synced ${addedCount} new transactions from your inbox!`);
-
-      // 🔥 STAMP THE MEMORY: Tell the app never to show the Sync screen again
       localStorage.setItem("hasSyncedInbox", "true");
 
-      if (typeof setIsBooting === 'function') {
-        setIsBooting(false); 
-      }
-      if (typeof setShowSMSModal === 'function') {
-        setShowSMSModal(false);
-      }
+      if (typeof setIsBooting === 'function') { setIsBooting(false); }
+      if (typeof setShowSMSModal === 'function') { setShowSMSModal(false); }
 
     }, (err) => {
       console.error("Failed to list SMS:", err);
@@ -152,81 +159,108 @@ function App() {
     switch (activeTab) {
       case 'dashboard': return <Dashboard />;
       case 'expenses': return (
-          <div className="bg-slate-800 rounded-xl border border-slate-700 p-4 shadow-xl">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-sm p-4 shadow-xl">
             <h2 className="text-xl font-bold text-white mb-4">All Transactions</h2>
             <ExpenseList expenses={expenses} />
           </div>
         );
       case 'subscriptions': return <SubscriptionView expenses={expenses} />;
       case 'patterns': return <PatternsView expenses={expenses} />;
+      case 'friends': return <FriendsView expenses={expenses} />; // 🔥 ADDED THIS
       default: return <Dashboard />;
     }
   };
 
-  // 🔥 GATEKEEPER 1: Wait for SQLite to Boot Up
   if (!isDbReady || loading) {
     return (
-      <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-4">
-        <h1 className="text-2xl font-black mb-4 animate-pulse">Waking up SQLite & Security...</h1>
+      <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col items-center justify-center p-4">
+        <h1 className="text-2xl font-black mb-4 animate-pulse tracking-tight">Waking up SQLite & Security...</h1>
       </div>
     );
   }
 
-  // 🔥 GATEKEEPER 2: If no one is logged in, block access and show the Vault UI
   if (!currentUser) {
     return <AuthScreen />;
   }
 
-  // 🔥 GATEKEEPER 3: The Smart SMS Inbox Check (Only runs once!)
   if (isBooting) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-center">
-        <h1 className="text-3xl font-black text-white mb-4">Mass Detector</h1>
-        <p className="text-slate-400 font-semibold mb-8">
-          Welcome to the vault, {currentUser.name}! Click below to sync your historical SMS data.
+      <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 bg-indigo-500 rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(99,102,241,0.3)]">
+           <Zap className="w-8 h-8 text-white" />
+        </div>
+        <h1 className="text-3xl font-black text-white mb-2 tracking-tight">Leak Detector</h1>
+        <p className="text-[10px] text-zinc-500 font-bold tracking-widest uppercase mb-10">Smart Financial Management</p>
+        
+        <p className="text-sm text-zinc-400 font-semibold mb-8">
+          Welcome back, {currentUser.name}! Click below to sync new SMS data.
         </p>
         
         <button 
           onClick={triggerManualSync}
-          className="px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-white shadow-lg transition-all"
+          className="w-full max-w-xs py-4 bg-indigo-600 hover:bg-indigo-500 rounded-sm font-bold text-white shadow-lg transition-all uppercase tracking-wider text-sm"
         >
-          I have allowed SMS ➡️ Sync Now
+          Sync Data Vault
         </button>
 
-        <p className="text-blue-400 font-semibold mt-8 animate-pulse">{bootMessage}</p>
+        <p className="text-indigo-400 font-semibold mt-8 animate-pulse text-xs">{bootMessage}</p>
       </div>
     );
   }
 
-  // --- NORMAL APP UI ---
   return (
-    <div className="min-h-screen bg-[#0a0a0a] font-sans text-zinc-200 p-4 md:p-8 selection:bg-indigo-500/30">
+    // 🔥 ADDED pb-24 so content isn't hidden behind the new mobile bottom nav
+    <div className="min-h-screen bg-[#0a0a0a] font-sans text-zinc-200 p-4 pb-24 md:p-8 md:pb-8 selection:bg-indigo-500/30">
       <Header />
       <main className="max-w-7xl mx-auto relative z-10">
         {renderTabContent()}
       </main>
 
+      {/* 🔥 MOBILE BOTTOM NAVIGATION BAR */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0a0a0a]/95 backdrop-blur-lg border-t border-zinc-800 flex justify-around items-center px-2 py-3 z-[100] pb-safe">
+        {[
+          { id: 'dashboard', label: 'Home', icon: Home },
+          { id: 'expenses', label: 'Txns', icon: List },
+          { id: 'friends', label: 'Friends', icon: Users }, // 🔥 ADDED THIS
+          { id: 'subscriptions', label: 'Subs', icon: RefreshCw },
+          { id: 'patterns', label: 'Patterns', icon: BarChart2 }
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex flex-col items-center gap-1 p-2 w-16 transition-colors ${isActive ? 'text-indigo-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+            >
+              <Icon className={`w-5 h-5 ${isActive ? 'fill-indigo-500/20' : ''}`} />
+              <span className="text-[9px] font-bold tracking-wide">{tab.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
       {/* SALARY MODAL */}
       {showSalaryModal && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-           <div className="bg-slate-800 p-6 rounded-2xl w-full max-w-md border border-slate-700 shadow-2xl">
-              <h2 className="text-2xl font-bold text-white mb-2">Welcome, {currentUser.name}!</h2>
-              <p className="text-slate-400 mb-6">Enter your monthly income to start tracking leaks.</p>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+           <div className="bg-zinc-900 p-8 rounded-sm w-full max-w-md border border-zinc-800 shadow-2xl">
+              <h2 className="text-2xl font-bold text-white mb-2">Welcome!</h2>
+              <p className="text-xs text-zinc-400 mb-6 uppercase tracking-widest font-semibold">Enter monthly income to track leaks.</p>
               
               <div className="relative mb-6">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-bold">₹</span>
                 <input 
                   type="number"
                   value={inputIncome}
                   onChange={(e) => setInputIncome(e.target.value)}
                   placeholder="e.g. 50000"
-                  className="w-full pl-9 pr-4 py-3 bg-slate-700/50 border border-slate-600 rounded-xl text-white font-semibold focus:outline-none focus:border-blue-500 transition-colors"
+                  className="w-full pl-9 pr-4 py-3 bg-[#0a0a0a] border border-zinc-800 rounded-sm text-white font-semibold focus:outline-none focus:border-indigo-500/50 transition-colors"
                 />
               </div>
 
               <button 
                 onClick={() => handleSalarySubmit(Number(inputIncome) || 0)} 
-                className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-white transition-colors shadow-lg shadow-blue-600/20"
+                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 rounded-sm font-bold text-white transition-all shadow-lg shadow-indigo-600/10 uppercase tracking-wider text-sm"
               >
                 Set Income
               </button>

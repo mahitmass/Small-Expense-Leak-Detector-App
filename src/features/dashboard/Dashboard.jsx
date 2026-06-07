@@ -1,26 +1,22 @@
 /* src/features/dashboard/Dashboard.jsx */
 import React, { useMemo } from 'react';
-import { TrendingDown, AlertCircle, Activity, Wallet } from 'lucide-react';
+import { TrendingDown, AlertCircle, Wallet, Activity } from 'lucide-react';
 import { useExpenses } from '../../context/ExpenseContext';
 
-// Import the pieces directly instead of using fragile "children" arrays
 import ExpenseForm from '../transactions/ExpenseForm';
 import LeakScoreCard from './LeakScoreCard';
 import CategoryBreakdown from './CategoryBreakdown';
 import InsightsPanel from './InsightsPanel';
 
 const Dashboard = () => {
-  // Grab everything directly from Context! No more prop drilling.
   const { expenses, insights, setInsights, leakScore, handleAddExpense } = useExpenses();
 
-  // --- REAL-TIME CALCULATIONS ---
   const stats = useMemo(() => {
     const totalSpent = expenses.reduce((sum, item) => sum + item.amount, 0);
-    
-    // Better: Import this from constants in the future, but keeping it safe for now
+    // 🔥 RESTORED: Your exact original categories list
     const LEAK_CATEGORIES = ["food", "subscription", "shopping", "transport", "entertainment", "snacks"];
     
-    const leakageItems = expenses.filter(e => LEAK_CATEGORIES.includes(e.category));
+    const leakageItems = expenses.filter(e => LEAK_CATEGORIES.includes(e.category.toLowerCase()));
     const totalLeakage = leakageItems.reduce((sum, item) => sum + item.amount, 0);
     const potentialSavings = Math.round(totalLeakage * 0.40);
 
@@ -28,75 +24,70 @@ const Dashboard = () => {
   }, [expenses]);
 
   const metrics = [
-    { title: 'Monthly Leakage', value: `₹${stats.totalLeakage.toLocaleString()}`, description: 'Money drained on non-essentials', icon: <TrendingDown className="text-red-400 w-6 h-6" />, bg: 'bg-red-500/10', text: 'text-red-400' },
-    { title: 'Active Leaks', value: stats.leakCount, description: 'Transactions flagged', icon: <AlertCircle className="text-yellow-400 w-6 h-6" />, bg: 'bg-yellow-500/10', text: 'text-yellow-400' },
-    { title: 'Potential Savings', value: `₹${stats.potentialSavings.toLocaleString()}`, description: 'If you optimize spending', icon: <Wallet className="text-emerald-400 w-6 h-6" />, bg: 'bg-emerald-500/10', text: 'text-emerald-400' }
+    { title: 'Monthly Leakage', value: `₹${stats.totalLeakage.toLocaleString()}`, description: 'Money drained on non-essentials', icon: <TrendingDown className="text-red-500 w-6 h-6" />, bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-500' },
+    { title: 'Active Leaks', value: stats.leakCount, description: 'Transactions flagged', icon: <AlertCircle className="text-amber-500 w-6 h-6" />, bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-500' },
+    { title: 'Potential Savings', value: `₹${stats.potentialSavings.toLocaleString()}`, description: 'If you optimize spending', icon: <Wallet className="text-emerald-500 w-6 h-6" />, bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-500' }
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in pb-12">
+    <div className="space-y-4 animate-fade-in">
       {/* Top Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {metrics.map(metric => (
-          <div key={metric.title} className="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-lg hover:border-slate-600 transition-colors group">
+          <div key={metric.title} className="bg-zinc-900 p-5 rounded-sm border border-zinc-800 shadow-[0_0_15px_rgba(0,0,0,0.5)] group">
             <div className="flex items-center justify-between mb-4">
-              <div className={`p-3 rounded-xl ${metric.bg} group-hover:scale-110 transition-transform`}>{metric.icon}</div>
-              <span className={`text-xs font-bold ${metric.text} bg-slate-900/50 px-2 py-1 rounded-lg uppercase tracking-wider`}>Live</span>
+              <div className={`p-2.5 rounded-lg ${metric.bg} border ${metric.border}`}>{metric.icon}</div>
+              <span className={`text-[9px] font-bold ${metric.text} ${metric.bg} px-2 py-1 rounded-sm uppercase tracking-widest border ${metric.border}`}>LIVE</span>
             </div>
             <div>
-              <p className="text-slate-400 text-sm font-medium mb-1">{metric.title}</p>
-              <p className="text-2xl font-bold text-white tracking-tight">{metric.value}</p>
-              <p className="text-xs text-slate-500 mt-2">{metric.description}</p>
+              <p className="text-zinc-400 text-[11px] font-bold uppercase tracking-wider mb-1">{metric.title}</p>
+              <p className="text-3xl font-black text-white tracking-tight">{metric.value}</p>
+              <p className="text-[10px] text-zinc-500 mt-1">{metric.description}</p>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Main Grid Layout */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-        
-        {/* LEFT COLUMN: Hero Score & Forms (4 cols) */}
-        <div className="xl:col-span-4 space-y-6 xl:sticky xl:top-6 z-0">
-          <div className="relative group">
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl opacity-75 blur group-hover:opacity-100 transition duration-1000"></div>
-            <div className="relative">
-              <LeakScoreCard leakScore={leakScore} />
-            </div>
-          </div>
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+        <div className="xl:col-span-4 space-y-4 xl:sticky xl:top-6 z-0">
+          <LeakScoreCard leakScore={leakScore} />
 
-          <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden shadow-xl">
-            <div className="p-4 border-b border-slate-700 bg-slate-800/50 backdrop-blur flex justify-between items-center">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Activity className="w-5 h-5 text-blue-400" /> Quick Add
+          <div className="bg-zinc-900 rounded-sm border border-zinc-800 shadow-xl">
+            <div className="p-4 border-b border-zinc-800 flex justify-between items-center">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <Activity className="w-4 h-4 text-indigo-400" /> Quick Add
               </h3>
             </div>
-            <div className="p-1">
-              <ExpenseForm onAddExpense={handleAddExpense} />
-            </div>
+            <ExpenseForm onAddExpense={handleAddExpense} />
           </div>
         </div>
         
-        {/* RIGHT COLUMN: Visuals & Insights (8 cols) */}
-        <div className="xl:col-span-8 space-y-6">
-          <div className="bg-slate-800 rounded-2xl border border-slate-700 p-1 shadow-xl">
+        <div className="xl:col-span-8 space-y-4">
+          <div className="bg-zinc-900 rounded-sm border border-zinc-800 p-5 shadow-xl">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4">Spending Breakdown</h3>
              {expenses.length > 0 ? (
                  <CategoryBreakdown expenses={expenses} />
              ) : (
-                 <div className="p-8 text-center text-slate-500">No data to breakdown yet. Add an expense!</div>
+                 <div className="p-8 text-center flex flex-col items-center gap-2">
+                    <Activity className="w-8 h-8 text-zinc-700" />
+                    <p className="text-xs text-zinc-500 font-semibold uppercase tracking-widest">No data yet. Add an expense!</p>
+                 </div>
              )}
           </div>
 
-          <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6 shadow-xl min-h-[300px]">
-            <h3 className="text-lg font-bold text-white mb-4">Smart Alerts</h3>
+          <div className="bg-zinc-900 rounded-sm border border-zinc-800 p-5 shadow-xl min-h-[300px]">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4">Smart Alerts</h3>
             {insights.length > 0 ? (
+                // 🔥 RESTORED: Your exact personality prop
                 <InsightsPanel 
                   insights={insights} 
                   onDismissInsight={(id) => setInsights(insights.filter(i => i.id !== id))} 
                   personality={expenses.length === 0 ? 'The Saver' : 'The Spender'}
                 />
             ) : (
-                <div className="flex items-center justify-center h-40 text-slate-500 bg-slate-900/50 rounded-xl border border-dashed border-slate-700">
-                    Your spending looks clean. No alerts!
+                <div className="flex flex-col items-center justify-center h-40 bg-[#0a0a0a] rounded-sm border border-zinc-800/50 gap-2">
+                    <AlertCircle className="w-6 h-6 text-zinc-700" />
+                    <p className="text-xs text-zinc-500 font-semibold uppercase tracking-widest">Spending is clean. No alerts!</p>
                 </div>
             )}
           </div>
