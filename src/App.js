@@ -1,4 +1,5 @@
 /* src/App.js */
+import { fetchDeviceContacts } from './utils/contacts';
 import React, { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import Header from './components/Header';
@@ -17,6 +18,7 @@ import AuthScreen from './features/auth/AuthScreen';
 function App() {
   // 🔥 PULL IN AUTH STATE
   const { currentUser, loading } = useAuth();
+  const [deviceContacts, setDeviceContacts] = useState([]);
 
   const {
     showSalaryModal, 
@@ -61,14 +63,19 @@ function App() {
     setupDB();
   }, []);
 
-  const triggerManualSync = () => {
+  const triggerManualSync = async () => {
     if (Capacitor.isNativePlatform()) {
+      setBootMessage("Syncing Contacts Library...");
+      // 🔥 Fetch native contacts and save to state
+      const syncedContacts = await fetchDeviceContacts();
+      setDeviceContacts(syncedContacts);
+
       setBootMessage("Accessing Native Inbox...");
       const smsEngine = window.SMS || (window.cordova && window.cordova.plugins && window.cordova.plugins.sms);
 
       if (smsEngine) {
         if (typeof smsEngine.listSMS === 'function') {
-          fetchNativeMessages(smsEngine);
+          fetchNativeMessages(smsEngine, syncedContacts); // Pass contacts to parser
         } else {
           setBootMessage("🚨 PLUGIN ERROR: listSMS function is still missing.");
         }
@@ -193,7 +200,7 @@ function App() {
 
   // --- NORMAL APP UI ---
   return (
-    <div className="min-h-screen bg-slate-900 font-sans text-slate-200 p-4 md:p-8 selection:bg-blue-500/30">
+    <div className="min-h-screen bg-[#0a0a0a] font-sans text-zinc-200 p-4 md:p-8 selection:bg-indigo-500/30">
       <Header />
       <main className="max-w-7xl mx-auto relative z-10">
         {renderTabContent()}

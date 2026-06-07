@@ -1,6 +1,7 @@
 /* src/context/AuthContext.js */
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getDB } from '../utils/db';
+import { Capacitor } from '@capacitor/core';
 
 const AuthContext = createContext();
 
@@ -9,7 +10,6 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Optional: Check local storage or session if user was previously logged in
         const savedUser = localStorage.getItem('active_user');
         if (savedUser) {
             setCurrentUser(JSON.parse(savedUser));
@@ -18,6 +18,14 @@ export function AuthProvider({ children }) {
     }, []);
 
     const handleSignUp = async (name, username, password) => {
+        // 🔥 WEB BYPASS: Mock the database for Vercel testing
+        if (Capacitor.getPlatform() === 'web') {
+            const user = { name, username };
+            setCurrentUser(user);
+            localStorage.setItem('active_user', JSON.stringify(user));
+            return { success: true };
+        }
+
         const db = getDB();
         if (!db) return { success: false, error: "Database not ready" };
 
@@ -25,7 +33,6 @@ export function AuthProvider({ children }) {
             const queryStr = `INSERT INTO users (name, username, password) VALUES (?, ?, ?)`;
             await db.run(queryStr, [name, username.toLowerCase().trim(), password]);
             
-            // Auto log in after signing up
             const user = { name, username };
             setCurrentUser(user);
             localStorage.setItem('active_user', JSON.stringify(user));
@@ -37,6 +44,14 @@ export function AuthProvider({ children }) {
     };
 
     const handleSignIn = async (username, password) => {
+        // 🔥 WEB BYPASS: Mock the database for Vercel testing
+        if (Capacitor.getPlatform() === 'web') {
+            const user = { name: "Web Tester", username };
+            setCurrentUser(user);
+            localStorage.setItem('active_user', JSON.stringify(user));
+            return { success: true };
+        }
+
         const db = getDB();
         if (!db) return { success: false, error: "Database not ready" };
 

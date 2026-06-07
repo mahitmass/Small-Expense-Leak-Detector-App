@@ -7,12 +7,10 @@ export default function AuthScreen() {
     const { handleSignIn, handleSignUp } = useAuth();
     const [isSignUp, setIsSignUp] = useState(false);
     
-    // Form fields
     const [name, setName] = useState('');
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     
-    // Feedback states
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
 
@@ -42,89 +40,85 @@ export default function AuthScreen() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center p-4">
-            <div className="w-full max-w-md bg-slate-800 border border-slate-700 rounded-3xl p-6 shadow-2xl">
+        <div className="min-h-screen bg-[#0a0a0a] flex flex-col justify-center items-center p-4">
+            <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-sm p-8 shadow-[0_0_20px_rgba(79,70,229,0.05)]">
                 
-                {/* Header Section */}
-                <div className="text-center mb-6">
+                <div className="text-center mb-8">
                     <h2 className="text-2xl font-black text-white tracking-tight">
                         {isSignUp ? "Create Local Profile" : "Access Financial Vault"}
                     </h2>
-                    <p className="text-sm text-slate-400 mt-1">
+                    <p className="text-xs text-zinc-400 mt-2 uppercase tracking-widest font-semibold">
                         {isSignUp ? "Securely save tracking data on device" : "Sign in to view your leak scores"}
                     </p>
                 </div>
 
-                {/* Error/Success Alerts */}
                 {error && (
-                    <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center gap-2 text-red-400 text-xs font-semibold">
+                    <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-sm flex items-center gap-2 text-red-400 text-xs font-semibold">
                         <ShieldAlert className="w-4 h-4 shrink-0" />
                         <span>{error}</span>
                     </div>
                 )}
                 {successMsg && (
-                    <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center gap-2 text-emerald-400 text-xs font-semibold">
+                    <div className="mb-6 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-sm flex items-center gap-2 text-emerald-400 text-xs font-semibold">
                         <CheckCircle className="w-4 h-4 shrink-0" />
                         <span>{successMsg}</span>
                     </div>
                 )}
 
-                {/* Main Form */}
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-5">
                     {isSignUp && (
                         <div>
-                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Full Name</label>
+                            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">Full Name</label>
                             <div className="relative">
-                                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
                                 <input 
                                     type="text"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     placeholder="e.g. John Doe"
-                                    className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 transition-all"
+                                    className="w-full pl-10 pr-4 py-3 bg-[#0a0a0a] border border-zinc-800 rounded-sm text-white text-sm focus:outline-none focus:border-indigo-500/50 transition-all"
                                 />
                             </div>
                         </div>
                     )}
 
                     <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Username / ID</label>
+                        <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">Username / ID</label>
                         <div className="relative">
-                            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
                             <input 
                                 type="text"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
                                 placeholder="Enter safe username"
-                                className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 transition-all"
+                                className="w-full pl-10 pr-4 py-3 bg-[#0a0a0a] border border-zinc-800 rounded-sm text-white text-sm focus:outline-none focus:border-indigo-500/50 transition-all"
                             />
                         </div>
                     </div>
 
                     <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Vault Password</label>
+                        <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">Vault Password</label>
                         <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
                             <input 
                                 type="password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 placeholder="••••••••"
-                                className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 transition-all"
+                                className="w-full pl-10 pr-4 py-3 bg-[#0a0a0a] border border-zinc-800 rounded-sm text-white text-sm focus:outline-none focus:border-indigo-500/50 transition-all"
                             />
                         </div>
                     </div>
 
                     <button 
                         type="submit"
-                        className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-indigo-600/20 active:scale-[0.98]"
+                        className="w-full mt-2 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-sm text-sm transition-all shadow-lg shadow-indigo-600/10 active:scale-[0.98] uppercase tracking-wider"
                     >
                         {isSignUp ? "Sign Up & Unlock" : "Sign In & Unlock"}
                     </button>
                 </form>
 
-                {/* Auth Mode Toggle Link */}
-                <div className="text-center mt-6 pt-4 border-t border-slate-700/50">
+                <div className="text-center mt-8 pt-6 border-t border-zinc-800">
                     <button 
                         type="button"
                         onClick={() => {
@@ -132,12 +126,11 @@ export default function AuthScreen() {
                             setError('');
                             setSuccessMsg('');
                         }}
-                        className="text-xs font-bold text-indigo-400 hover:text-indigo-300"
+                        className="text-xs font-bold text-zinc-400 hover:text-white transition-colors"
                     >
                         {isSignUp ? "Already have a vault profile? Sign In" : "Need a profile entry? Sign Up"}
                     </button>
                 </div>
-
             </div>
         </div>
     );
