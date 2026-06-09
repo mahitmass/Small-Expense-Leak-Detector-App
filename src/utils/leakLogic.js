@@ -1,4 +1,5 @@
 /* src/utils/leakLogic.js */
+import { fireLeakWarning } from './notificationEngine';
 
 // ==========================================
 // 1. THE BRAIN: EXPANDED MERCHANT DATABASE
@@ -112,7 +113,7 @@ function determinePersonality(totals, totalLeak) {
 }
 
 // ==========================================
-// 3. THE SMART INSIGHT ENGINE (ALL 10 RULES PRESERVED)
+// 3. THE SMART INSIGHT ENGINE 
 // ==========================================
 
 export const generateSmartInsights = (expenses, categoryTotals) => {
@@ -261,4 +262,32 @@ export const generateSmartInsights = (expenses, categoryTotals) => {
   }
 
   return insights;
+};
+
+// ==========================================
+// 4. DAILY LIMIT & NOTIFICATION ENGINE
+// ==========================================
+
+export const evaluateDailyLeaks = (newTransaction, todayExpenses, dailyLimit) => {
+    // Only check if it's actually a leak category
+    if (!LEAK_CATEGORIES.includes(newTransaction.category)) return 0;
+
+    // Calculate how much was already spent today on LEAKS
+    const currentDailyTotal = todayExpenses
+        .filter(e => LEAK_CATEGORIES.includes(e.category))
+        .reduce((sum, e) => sum + e.amount, 0);
+
+    const newTotal = currentDailyTotal + newTransaction.amount;
+
+    // If this specific transaction pushes them over the edge
+    if (currentDailyTotal <= dailyLimit && newTotal > dailyLimit) {
+        fireLeakWarning(
+            newTransaction.description, 
+            newTransaction.amount, 
+            newTotal, 
+            dailyLimit
+        );
+    }
+
+    return newTotal;
 };
