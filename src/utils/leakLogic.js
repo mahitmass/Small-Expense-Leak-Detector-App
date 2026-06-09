@@ -1,6 +1,5 @@
 /* src/utils/leakLogic.js */
 import { fireLeakWarning } from './notificationEngine';
-
 // ==========================================
 // 1. THE BRAIN: EXPANDED MERCHANT DATABASE
 // ==========================================
