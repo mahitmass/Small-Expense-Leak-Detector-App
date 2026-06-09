@@ -1,6 +1,7 @@
 /* src/features/transactions/FriendsView.jsx */
 import React, { useState } from 'react';
-import { Users, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+// 🔥 ADDED MessageCircle IMPORT
+import { Users, CheckCircle, XCircle, AlertCircle, MessageCircle } from 'lucide-react';
 
 const FriendsView = ({ expenses }) => {
   // Filter only transactions that were marked as Contact/UPI payments
@@ -12,6 +13,13 @@ const FriendsView = ({ expenses }) => {
   const handleVerify = (id, status) => {
     setVerifiedStates(prev => ({ ...prev, [id]: status }));
     // In the future, this should dispatch to ExpenseContext to update SQLite
+  };
+
+  // 🔥 THE WHATSAPP BRIDGE
+  const handleWhatsAppRequest = (amount, merchant) => {
+    const splitAmount = (amount / 2).toFixed(0); // Simple 2-way split
+    const text = `Hey! We split the bill for ${merchant}. Your half is ₹${splitAmount}. You can UPI me here: yourname@upi`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   if (friendTxns.length === 0) {
@@ -70,9 +78,18 @@ const FriendsView = ({ expenses }) => {
                      </button>
                   </div>
                 ) : verification === 'legit' ? (
-                  <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest flex items-center gap-1">
-                    <CheckCircle className="w-3 h-3" /> Verified Expense
-                  </span>
+                  // 🔥 ADDED THE WHATSAPP BUTTON UI HERE
+                  <div className="flex items-center justify-end gap-3 w-full ml-2">
+                    <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" /> Verified
+                    </span>
+                    <button 
+                      onClick={() => handleWhatsAppRequest(txn.amount, txn.description)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 rounded-sm text-[9px] font-bold uppercase tracking-wider transition-colors"
+                    >
+                      <MessageCircle className="w-3 h-3" /> Request on WhatsApp
+                    </button>
+                  </div>
                 ) : (
                   <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest flex items-center gap-1">
                     <XCircle className="w-3 h-3" /> Flagged Leak
