@@ -17,6 +17,7 @@ import { initializeDatabase } from './utils/db';
 import { useAuth } from './context/AuthContext';
 import AuthScreen from './features/auth/AuthScreen';
 import { fetchDeviceContacts } from './utils/contacts';
+import PullToRefresh from './components/PullToRefresh';
 
 function App() {
   const { currentUser, loading } = useAuth();
@@ -215,7 +216,9 @@ function App() {
     <div className="min-h-screen bg-[#0a0a0a] font-sans text-zinc-200 p-4 pb-24 md:p-8 md:pb-8 selection:bg-indigo-500/30">
       <Header />
       <main className="max-w-7xl mx-auto relative z-10">
-        {renderTabContent()}
+        <PullToRefresh onRefresh={triggerManualSync}>
+          {renderTabContent()}
+        </PullToRefresh>
       </main>
 
       {/* 🔥 MOBILE BOTTOM NAVIGATION BAR */}
