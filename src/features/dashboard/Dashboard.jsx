@@ -7,13 +7,13 @@ import ExpenseForm from '../transactions/ExpenseForm';
 import LeakScoreCard from './LeakScoreCard';
 import CategoryBreakdown from './CategoryBreakdown';
 import InsightsPanel from './InsightsPanel';
+import SubscriptionAlerts from './SubscriptionAlerts';
 
 const Dashboard = () => {
   const { expenses, insights, setInsights, leakScore, handleAddExpense } = useExpenses();
 
   const stats = useMemo(() => {
     const totalSpent = expenses.reduce((sum, item) => sum + item.amount, 0);
-    // 🔥 RESTORED: Your exact original categories list
     const LEAK_CATEGORIES = ["food", "subscription", "shopping", "transport", "entertainment", "snacks"];
     
     const leakageItems = expenses.filter(e => LEAK_CATEGORIES.includes(e.category.toLowerCase()));
@@ -52,6 +52,9 @@ const Dashboard = () => {
         <div className="xl:col-span-4 space-y-4 xl:sticky xl:top-6 z-0">
           <LeakScoreCard leakScore={leakScore} />
 
+          {/* 🔥 THE WIDGET IS NOW ACTUALLY MOUNTED HERE */}
+          <SubscriptionAlerts />
+
           <div className="bg-zinc-900 rounded-sm border border-zinc-800 shadow-xl">
             <div className="p-4 border-b border-zinc-800 flex justify-between items-center">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
@@ -78,7 +81,6 @@ const Dashboard = () => {
           <div className="bg-zinc-900 rounded-sm border border-zinc-800 p-5 shadow-xl min-h-[300px]">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4">Smart Alerts</h3>
             {insights.length > 0 ? (
-                // 🔥 RESTORED: Your exact personality prop
                 <InsightsPanel 
                   insights={insights} 
                   onDismissInsight={(id) => setInsights(insights.filter(i => i.id !== id))} 

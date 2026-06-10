@@ -1,4 +1,5 @@
 /* src/App.js */
+import { initializeNotifications } from './utils/notificationEngine';
 import React, { useEffect, useState } from 'react';
 import { Zap } from 'lucide-react';
 import { Home, List, RefreshCw, BarChart2, Users } from 'lucide-react'; // Added Users
@@ -39,6 +40,7 @@ function App() {
   const [bootMessage, setBootMessage] = useState("Initializing Engine...");
 
   useEffect(() => {
+    initializeNotifications();
     const setupDB = async () => {
       if (Capacitor.getPlatform() === 'web') {
         setIsDbReady(true);

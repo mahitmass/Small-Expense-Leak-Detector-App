@@ -1,7 +1,9 @@
 /* src/context/ExpenseContext.js */
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { categorizeTransaction, calculateLeakAnalysis, generateSmartInsights } from '../utils/leakLogic';
-import { getDB } from '../utils/db'; // 🔥 Importing the new SQLite database
+import { categorizeTransaction, calculateLeakAnalysis, generateSmartInsights, evaluateDailyLeaks } from '../utils/leakLogic';
+import { getDB } from '../utils/db'; 
+// 🔥 RESTORED: The subscription engine import
+import { scanForSubscriptions } from '../utils/subscriptionScanner'; 
 
 const ExpenseContext = createContext();
 
@@ -12,8 +14,11 @@ export function ExpenseProvider({ children }) {
   const [monthlyIncome, setMonthlyIncome] = useState(0);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showSalaryModal, setShowSalaryModal] = useState(true);
+  
+  // 🔥 RESTORED: The subscription state
+  const [upcomingSubscriptions, setUpcomingSubscriptions] = useState([]);
 
-  // 🔥 INITIAL LOAD: Fetch data from SQLite when the app boots
+  // INITIAL LOAD: Fetch data from SQLite when the app boots
   useEffect(() => {
     const loadData = async () => {
       const db = getDB();
@@ -35,6 +40,10 @@ export function ExpenseProvider({ children }) {
 
           setExpenses(dbExpenses);
           runAnalysis(dbExpenses, monthlyIncome);
+
+          // 🔥 RESTORED: Run the subscription scanner on boot
+          const predicted = scanForSubscriptions(dbExpenses);
+          setUpcomingSubscriptions(predicted);
 
         } catch (error) {
           console.error("❌ Failed to load from SQLite:", error);
@@ -64,37 +73,46 @@ export function ExpenseProvider({ children }) {
     runAnalysis(expenses, income);
   };
 
-  // 🔥 UPDATE: Save single expense to SQLite
+  // UPDATE: Save single expense to SQLite
   const handleAddExpense = async (newExpense) => {
+    // 1. Ensure category is set
     if (!newExpense.category || newExpense.category === 'misc') {
       newExpense.category = categorizeTransaction(newExpense.description);
     }
     
+    // 2. Save to SQLite Database
     const db = getDB();
     if (db) {
       try {
         const query = `INSERT INTO transactions (amount, merchant, date, category, type, unique_hash) VALUES (?, ?, ?, ?, ?, ?)`;
-        const hash = `${newExpense.description}-${newExpense.amount}-${newExpense.date}`; // Basic unique hash
+        const hash = `${newExpense.description}-${newExpense.amount}-${newExpense.date}`; 
         await db.run(query, [newExpense.amount, newExpense.description, newExpense.date, newExpense.category, 'debit', hash]);
       } catch (err) {
         console.error("SQLite Insert Error:", err);
       }
     }
 
+    // 3. THE DAILY LEAK MONITOR 
+    const dailyLeakLimit = 500; 
+    evaluateDailyLeaks(newExpense, expenses, dailyLeakLimit);
+
+    // 4. Update UI and State
     const updated = [newExpense, ...expenses];
     setExpenses(updated);
     runAnalysis(updated, monthlyIncome);
+    
+    // 5. Update subscriptions in case the new expense was a recurring one
+    setUpcomingSubscriptions(scanForSubscriptions(updated));
   };
 
-  // 🔥 UPDATE: Bulk save 50+ transactions to SQLite without overwriting!
+  // Bulk save to SQLite
   const handleAddMultipleExpenses = async (newExpensesArray) => {
     const db = getDB();
     if (db) {
       try {
-        // Run a loop to insert the massive batch safely into the database
         for (const exp of newExpensesArray) {
           const cat = (!exp.category || exp.category === 'misc') ? categorizeTransaction(exp.description) : exp.category;
-          const hash = `${exp.description}-${exp.amount}-${exp.date}-${Math.random()}`; // Prevent hash collisions
+          const hash = `${exp.description}-${exp.amount}-${exp.date}-${Math.random()}`; 
           const query = `INSERT OR IGNORE INTO transactions (amount, merchant, date, category, type, unique_hash) VALUES (?, ?, ?, ?, ?, ?)`;
           await db.run(query, [exp.amount, exp.description, exp.date, cat, 'debit', hash]);
         }
@@ -106,6 +124,7 @@ export function ExpenseProvider({ children }) {
     const updated = [...newExpensesArray, ...expenses];
     setExpenses(updated);
     runAnalysis(updated, monthlyIncome);
+    setUpcomingSubscriptions(scanForSubscriptions(updated));
   };
 
   const handleDeleteExpense = async (id) => {
@@ -121,15 +140,16 @@ export function ExpenseProvider({ children }) {
     const updated = expenses.filter(expense => expense.id !== id);
     setExpenses(updated);
     runAnalysis(updated, monthlyIncome);
+    setUpcomingSubscriptions(scanForSubscriptions(updated));
   };
 
   return (
     <ExpenseContext.Provider value={{
       expenses, insights, setInsights, leakScore, monthlyIncome, activeTab, setActiveTab,
-      showSalaryModal, setShowSalaryModal,
+      showSalaryModal, setShowSalaryModal, 
+      upcomingSubscriptions, // 🔥 RESTORED: Exporting it to the app
       handleSalarySubmit, handleAddExpense, 
-      handleAddMultipleExpenses,
-      handleDeleteExpense
+      handleAddMultipleExpenses, handleDeleteExpense
     }}>
       {children}
     </ExpenseContext.Provider>
