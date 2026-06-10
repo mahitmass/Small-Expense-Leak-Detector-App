@@ -213,7 +213,10 @@ function App() {
 
   return (
     // 🔥 ADDED pb-24 so content isn't hidden behind the new mobile bottom nav
-    <div className="min-h-screen bg-[#0a0a0a] font-sans text-zinc-200 p-4 pb-24 md:p-8 md:pb-8 selection:bg-indigo-500/30">
+    <div 
+  className="min-h-screen bg-[#0a0a0a] font-sans text-zinc-200 p-4 pb-24 md:p-8 md:pb-8 selection:bg-indigo-500/30"
+  style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 3.5rem))' }}
+>
       <Header />
       <main className="max-w-7xl mx-auto relative z-10">
         <PullToRefresh onRefresh={triggerManualSync}>
