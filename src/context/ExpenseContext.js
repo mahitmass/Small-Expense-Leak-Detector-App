@@ -2,8 +2,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { categorizeTransaction, calculateLeakAnalysis, generateSmartInsights, evaluateDailyLeaks } from '../utils/leakLogic';
 import { getDB } from '../utils/db'; 
-// 🔥 RESTORED: The subscription engine import
 import { scanForSubscriptions } from '../utils/subscriptionScanner'; 
+// 🔥 NEW: Import the Sync Engine
+import { syncNotification } from '../utils/notificationSync'; 
 
 const ExpenseContext = createContext();
 
@@ -14,8 +15,6 @@ export function ExpenseProvider({ children }) {
   const [monthlyIncome, setMonthlyIncome] = useState(0);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showSalaryModal, setShowSalaryModal] = useState(true);
-  
-  // 🔥 RESTORED: The subscription state
   const [upcomingSubscriptions, setUpcomingSubscriptions] = useState([]);
 
   // INITIAL LOAD: Fetch data from SQLite when the app boots
@@ -41,7 +40,6 @@ export function ExpenseProvider({ children }) {
           setExpenses(dbExpenses);
           runAnalysis(dbExpenses, monthlyIncome);
 
-          // 🔥 RESTORED: Run the subscription scanner on boot
           const predicted = scanForSubscriptions(dbExpenses);
           setUpcomingSubscriptions(predicted);
 
@@ -52,6 +50,15 @@ export function ExpenseProvider({ children }) {
     };
     loadData();
   }, [monthlyIncome]);
+
+  // 🔥 NEW: The Master Alert Function (Fires Android Push + Updates Bell Icon)
+  const dispatchAlert = async (title, message) => {
+    await syncNotification(Date.now(), title, message, (newAlert) => {
+      // We tag it as 'isDynamic' so it doesn't get erased by static analysis
+      const finalAlert = { ...newAlert, isDynamic: true };
+      setInsights(prev => [finalAlert, ...prev]);
+    });
+  };
 
   const runAnalysis = (currentExpenses, income) => {
     const safeIncome = income || monthlyIncome;
@@ -64,7 +71,12 @@ export function ExpenseProvider({ children }) {
     }, {});
     
     const newInsights = generateSmartInsights(currentExpenses, totals);
-    setInsights(newInsights);
+    
+    // 🔥 FIX: Merge the new static insights with your dynamic Android alerts
+    setInsights(prev => {
+      const dynamicAlerts = prev.filter(p => p.isDynamic);
+      return [...dynamicAlerts, ...newInsights];
+    });
   };
 
   const handleSalarySubmit = (income) => {
@@ -73,14 +85,11 @@ export function ExpenseProvider({ children }) {
     runAnalysis(expenses, income);
   };
 
-  // UPDATE: Save single expense to SQLite
   const handleAddExpense = async (newExpense) => {
-    // 1. Ensure category is set
     if (!newExpense.category || newExpense.category === 'misc') {
       newExpense.category = categorizeTransaction(newExpense.description);
     }
     
-    // 2. Save to SQLite Database
     const db = getDB();
     if (db) {
       try {
@@ -92,20 +101,22 @@ export function ExpenseProvider({ children }) {
       }
     }
 
-    // 3. THE DAILY LEAK MONITOR 
+    // 🔥 THE DAILY LEAK MONITOR 
     const dailyLeakLimit = 500; 
-    evaluateDailyLeaks(newExpense, expenses, dailyLeakLimit);
+    const leakWarning = evaluateDailyLeaks(newExpense, expenses, dailyLeakLimit);
+    
+    // Trigger the synchronized alert if a leak is detected
+    if (leakWarning) {
+      const msg = typeof leakWarning === 'string' ? leakWarning : `You exceeded your ₹${dailyLeakLimit} daily limit!`;
+      dispatchAlert("Daily Leak Alert 🚨", msg);
+    }
 
-    // 4. Update UI and State
     const updated = [newExpense, ...expenses];
     setExpenses(updated);
     runAnalysis(updated, monthlyIncome);
-    
-    // 5. Update subscriptions in case the new expense was a recurring one
     setUpcomingSubscriptions(scanForSubscriptions(updated));
   };
 
-  // Bulk save to SQLite
   const handleAddMultipleExpenses = async (newExpensesArray) => {
     const db = getDB();
     if (db) {
@@ -146,10 +157,9 @@ export function ExpenseProvider({ children }) {
   return (
     <ExpenseContext.Provider value={{
       expenses, insights, setInsights, leakScore, monthlyIncome, activeTab, setActiveTab,
-      showSalaryModal, setShowSalaryModal, 
-      upcomingSubscriptions, // 🔥 RESTORED: Exporting it to the app
-      handleSalarySubmit, handleAddExpense, 
-      handleAddMultipleExpenses, handleDeleteExpense
+      showSalaryModal, setShowSalaryModal, upcomingSubscriptions,
+      handleSalarySubmit, handleAddExpense, handleAddMultipleExpenses, handleDeleteExpense,
+      dispatchAlert // 🔥 Exported so you can call it from anywhere!
     }}>
       {children}
     </ExpenseContext.Provider>
