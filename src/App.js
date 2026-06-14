@@ -39,6 +39,7 @@ function App() {
   const [isDbReady, setIsDbReady] = useState(false);
   const [isBooting, setIsBooting] = useState(true);
   const [bootMessage, setBootMessage] = useState("Initializing Engine...");
+  const [toastMsg, setToastMsg] = useState(null);
 
   useEffect(() => {
     initializeNotifications();
@@ -64,6 +65,14 @@ function App() {
     setupDB();
   }, []);
 
+  // 🔥 AUTO-SYNC ON TAB SWITCH
+  useEffect(() => {
+    // Added currentUser check so it NEVER syncs while on the AuthScreen
+    if (currentUser && !isBooting && (activeTab === 'dashboard' || activeTab === 'expenses')) {
+      triggerManualSync();
+    }
+  }, [activeTab, isBooting, currentUser]);
+
   const triggerManualSync = async () => {
     if (Capacitor.isNativePlatform()) {
       setBootMessage("Syncing Contacts Library...");
@@ -88,7 +97,7 @@ function App() {
     }
   };
 
-  const fetchNativeMessages = (smsEngine, syncedContacts) => {
+ const fetchNativeMessages = (smsEngine, syncedContacts) => {
     const filter = { box: 'inbox', maxCount: 200 }; 
     
     smsEngine.listSMS(filter, (messages) => {
@@ -99,16 +108,21 @@ function App() {
         const parsedTransaction = parseBankSMS(msg.body); 
         
         if (parsedTransaction && parsedTransaction.type === 'debit') {
-          const isDuplicateState = expenses.some(e => e.amount === parsedTransaction.amount && e.description === parsedTransaction.merchant && e.date === parsedTransaction.date);
-          const isDuplicateNew = bulkExpenses.some(e => e.amount === parsedTransaction.amount && e.description === parsedTransaction.merchant && e.date === parsedTransaction.date);
+          // 🔥 BUG FIX 1: Resolve the date BEFORE checking for duplicates!
+          const finalDate = parsedTransaction.date ? parsedTransaction.date.split('T')[0] : new Date().toISOString().split('T')[0];
+          const safeAmount = Math.round(parsedTransaction.amount);
+
+          // Now it accurately checks '2026-06-14' against '2026-06-14'
+          const isDuplicateState = expenses.some(e => e.amount === safeAmount && e.description === parsedTransaction.merchant && e.date === finalDate);
+          const isDuplicateNew = bulkExpenses.some(e => e.amount === safeAmount && e.description === parsedTransaction.merchant && e.date === finalDate);
           
           if (!isDuplicateState && !isDuplicateNew) {
             bulkExpenses.push({
               id: Math.random().toString(36).substring(7),
               description: parsedTransaction.merchant,
-              amount: parsedTransaction.amount,
+              amount: safeAmount,
               category: parsedTransaction.merchant.toLowerCase().includes('upi') ? 'transfer' : 'shopping', 
-              date: parsedTransaction.date ? parsedTransaction.date.split('T')[0] : new Date().toISOString().split('T')[0],
+              date: finalDate, // Use the resolved date here too
               time: 'day',
               isContactPayment: parsedTransaction.merchant.toLowerCase().includes('upi')
             });
@@ -120,32 +134,30 @@ function App() {
       if (bulkExpenses.length > 0) {
         handleAddMultipleExpenses(bulkExpenses);
         
-        // 🔥 TRIGGER THE PUSH NOTIFICATION
         LocalNotifications.schedule({
           notifications: [
             {
               title: "Vault Synced",
               body: `Detected ${addedCount} new transactions. Check your leak score.`,
               id: Date.now(),
-              schedule: { at: new Date(Date.now() + 1000) }, // Trigger in 1 second
-              sound: null,
-              attachments: null,
-              actionTypeId: "",
-              extra: null
+              schedule: { at: new Date(Date.now() + 1000) }
             }
           ]
         });
+
+        // 🔥 BUG FIX 2: Trigger the sleek in-app toast instead of alert()
+        setToastMsg(`Synced ${addedCount} new transactions!`);
+        setTimeout(() => setToastMsg(null), 4000); // Auto-hides after 4 seconds
       }
 
-      alert(`✅ Synced ${addedCount} new transactions from your inbox!`);
       localStorage.setItem("hasSyncedInbox", "true");
-
       if (typeof setIsBooting === 'function') { setIsBooting(false); }
       if (typeof setShowSMSModal === 'function') { setShowSMSModal(false); }
 
     }, (err) => {
       console.error("Failed to list SMS:", err);
-      alert("Error reading SMS inbox.");
+      setToastMsg("Error reading SMS inbox.");
+      setTimeout(() => setToastMsg(null), 4000);
     });
   };
 
@@ -169,7 +181,7 @@ function App() {
         );
       case 'subscriptions': return <SubscriptionView expenses={expenses} />;
       case 'patterns': return <PatternsView expenses={expenses} />;
-      case 'friends': return <FriendsView expenses={expenses} />; // 🔥 ADDED THIS
+      case 'friends': return <FriendsView expenses={expenses} contacts={deviceContacts} />;
       default: return <Dashboard />;
     }
   };
@@ -218,6 +230,13 @@ function App() {
   style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 3.5rem))' }}
 >
       <Header />
+      {/* 🔥 CUSTOM IN-APP TOAST NOTIFICATION */}
+      {toastMsg && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] bg-[#0a0a0a] border border-emerald-500/30 text-emerald-400 px-6 py-3 rounded-full shadow-[0_10px_40px_rgba(16,185,129,0.2)] flex items-center gap-3 font-bold text-xs tracking-widest uppercase transition-all animate-bounce">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+            {toastMsg}
+        </div>
+      )}
       <main className="max-w-7xl mx-auto relative z-10">
         <PullToRefresh onRefresh={triggerManualSync}>
           {renderTabContent()}
@@ -280,3 +299,5 @@ function App() {
 }
 
 export default App;
+//yo
+
