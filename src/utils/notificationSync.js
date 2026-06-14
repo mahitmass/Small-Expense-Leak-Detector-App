@@ -11,7 +11,7 @@ export const syncNotification = async (id, title, message, addInsightToContext) 
     isRead: false
   };
   
-  // Call the function from your ExpenseContext to update the UI
+  // Call the function from your ExpenseContext to update the React Bell Icon
   if (addInsightToContext) {
     addInsightToContext(newInsight);
   }
@@ -30,9 +30,9 @@ export const syncNotification = async (id, title, message, addInsightToContext) 
         {
           title: title,
           body: message,
-          id: newInsight.id, // Keep the IDs matching!
-          schedule: { at: new Date(Date.now() + 1000) }, // Fire almost immediately
-          smallIcon: 'ic_stat_icon_config_sample', // Your Android icon
+          id: newInsight.id, 
+          schedule: { at: new Date(Date.now() + 1000) }
+          // 🔥 REMOVED smallIcon: It causes silent failures if the icon doesn't exist in Android Studio!
         }
       ]
     });

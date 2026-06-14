@@ -1,104 +1,96 @@
 /* src/features/transactions/FriendsView.jsx */
-import React, { useState } from 'react';
-// 🔥 ADDED MessageCircle IMPORT
-import { Users, CheckCircle, XCircle, AlertCircle, MessageCircle } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Users, ArrowUpRight, Search } from 'lucide-react';
 
-const FriendsView = ({ expenses }) => {
-  // Filter only transactions that were marked as Contact/UPI payments
-  const friendTxns = expenses.filter(e => e.isContactPayment);
-  
-  // Local state to handle the UI toggling of verified items
-  const [verifiedStates, setVerifiedStates] = useState({});
+const FriendsView = ({ expenses, contacts = [] }) => {
+  const contactLedger = useMemo(() => {
+    const transfers = expenses.filter(exp => exp.category === 'transfer' || exp.isContactPayment);
+    const ledger = {};
 
-  const handleVerify = (id, status) => {
-    setVerifiedStates(prev => ({ ...prev, [id]: status }));
-    // In the future, this should dispatch to ExpenseContext to update SQLite
-  };
+    transfers.forEach(tx => {
+      const rawName = tx.description.replace(/UPI|transfer|to|-/gi, ' ').trim();
+      const extractedName = rawName.split(' ')[0] || "Unknown";
 
-  // 🔥 THE WHATSAPP BRIDGE
-  const handleWhatsAppRequest = (amount, merchant) => {
-    const splitAmount = (amount / 2).toFixed(0); // Simple 2-way split
-    const text = `Hey! We split the bill for ${merchant}. Your half is ₹${splitAmount}. You can UPI me here: yourname@upi`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-  };
+      // 🔥 THE SMART CONTACT FILTER
+      // Try to find if this parsed name actually exists in your phone's contact list
+      const matchedContact = contacts.find(c => 
+        c.name.toLowerCase().includes(extractedName.toLowerCase())
+      );
 
-  if (friendTxns.length === 0) {
-    return (
-      <div className="text-center py-12 border border-zinc-800 border-dashed rounded-sm bg-[#0a0a0a] mt-4">
-        <Users className="w-8 h-8 text-zinc-600 mx-auto mb-3" />
-        <h3 className="text-zinc-400 font-bold text-xs uppercase tracking-wider">No Social Activity</h3>
-        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">No contact payments detected.</p>
-      </div>
-    );
-  }
+      // If we found a real contact, use their real full name! Otherwise, fallback.
+      const displayName = matchedContact ? matchedContact.name : extractedName;
+
+      // Filter out obvious non-human merchants that slipped through UPI
+      const ignoreList = ['SWIGGY', 'ZOMATO', 'AMAZON', 'FLIPKART', 'UBER', 'OLA'];
+      if (ignoreList.includes(displayName.toUpperCase())) return;
+
+      if (!ledger[displayName]) {
+        ledger[displayName] = { name: displayName, totalSent: 0, count: 0, lastTx: tx.date };
+      }
+      
+      ledger[displayName].totalSent += tx.amount;
+      ledger[displayName].count += 1;
+      
+      if (new Date(tx.date) > new Date(ledger[displayName].lastTx)) {
+        ledger[displayName].lastTx = tx.date;
+      }
+    });
+
+    return Object.values(ledger).sort((a, b) => b.totalSent - a.totalSent);
+  }, [expenses, contacts]);
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="bg-indigo-600/10 border border-indigo-500/20 rounded-sm p-5 shadow-xl">
-         <h2 className="text-sm font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2 mb-2">
-            <AlertCircle className="w-4 h-4" /> Social Leak Audit
-         </h2>
-         <p className="text-[11px] text-zinc-400 font-medium">
-            Verify your contact transfers. Was this a legitimate shared expense (✔️) or did you spot a friend / make an impulse buy (❌)?
-         </p>
+    <div className="pb-10 space-y-6 animate-fade-in">
+      {/* Top summary card omitted for brevity, keep the same UI you had before! */}
+      <div className="bg-zinc-900 rounded-sm border border-zinc-800 p-6 shadow-xl relative overflow-hidden">
+        <div className="absolute right-[-20px] top-[-20px] opacity-10">
+          <Users className="w-32 h-32 text-indigo-400" />
+        </div>
+        <div className="relative z-10">
+          <p className="text-[10px] text-zinc-500 font-bold tracking-widest uppercase mb-1">Total Sent to Friends</p>
+          <h2 className="text-3xl font-black text-white mb-2">
+            ₹{contactLedger.reduce((sum, c) => sum + c.totalSent, 0).toLocaleString()}
+          </h2>
+          <div className="inline-block bg-indigo-500/10 px-3 py-1.5 rounded-sm border border-indigo-500/20 text-[10px] font-bold text-indigo-400 uppercase tracking-widest">
+            {contactLedger.length} Verified Contacts
+          </div>
+        </div>
       </div>
 
-      <div className="space-y-3">
-        {friendTxns.map(txn => {
-          const verification = verifiedStates[txn.id];
+      <div className="bg-[#0a0a0a] border border-zinc-800 rounded-sm overflow-hidden">
+        <div className="p-4 border-b border-zinc-800 bg-zinc-900/50">
+          <h3 className="text-xs font-bold text-white tracking-widest uppercase">Contact Leaderboard</h3>
+        </div>
 
-          return (
-            <div key={txn.id} className="bg-zinc-900 border border-zinc-800 rounded-sm p-4 transition-all hover:border-zinc-700">
-              <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-sm bg-[#0a0a0a] border border-zinc-800 flex items-center justify-center text-zinc-400 font-bold text-sm uppercase">
-                    {txn.description.charAt(0)}
+        <div className="divide-y divide-zinc-800">
+          {contactLedger.length === 0 ? (
+            <div className="p-8 text-center text-zinc-500 text-xs font-bold uppercase tracking-wider">
+               No friends detected yet. Sync Contacts!
+            </div>
+          ) : (
+            contactLedger.map((contact, idx) => (
+              <div key={idx} className="p-4 hover:bg-zinc-900/30 transition-colors flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-white font-black shadow-inner">
+                    {contact.name.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-zinc-200 uppercase tracking-wide">{txn.description}</h3>
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 mt-1">{txn.date}</p>
+                    <h4 className="text-sm font-bold text-white uppercase tracking-wider">{contact.name}</h4>
+                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">
+                      {contact.count} transfers • Last: {contact.lastTx}
+                    </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-sm font-black text-white">₹{txn.amount}</span>
+                <div className="text-right flex items-center gap-2">
+                  <span className="text-sm font-bold text-white">₹{contact.totalSent.toLocaleString()}</span>
+                  <div className="w-6 h-6 rounded-sm bg-red-500/10 flex items-center justify-center border border-red-500/20">
+                    <ArrowUpRight className="w-3 h-3 text-red-400" />
+                  </div>
                 </div>
               </div>
-
-              {/* VERIFICATION UI */}
-              <div className="flex items-center justify-between pt-3 border-t border-zinc-800/50">
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Status:</span>
-                
-                {!verification ? (
-                  <div className="flex gap-2">
-                     <button onClick={() => handleVerify(txn.id, 'legit')} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-sm text-[9px] font-bold uppercase tracking-wider transition-colors">
-                        <CheckCircle className="w-3 h-3" /> Legit Split
-                     </button>
-                     <button onClick={() => handleVerify(txn.id, 'leak')} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-sm text-[9px] font-bold uppercase tracking-wider transition-colors">
-                        <XCircle className="w-3 h-3" /> Social Leak
-                     </button>
-                  </div>
-                ) : verification === 'legit' ? (
-                  // 🔥 ADDED THE WHATSAPP BUTTON UI HERE
-                  <div className="flex items-center justify-end gap-3 w-full ml-2">
-                    <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest flex items-center gap-1">
-                      <CheckCircle className="w-3 h-3" /> Verified
-                    </span>
-                    <button 
-                      onClick={() => handleWhatsAppRequest(txn.amount, txn.description)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 rounded-sm text-[9px] font-bold uppercase tracking-wider transition-colors"
-                    >
-                      <MessageCircle className="w-3 h-3" /> Request on WhatsApp
-                    </button>
-                  </div>
-                ) : (
-                  <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest flex items-center gap-1">
-                    <XCircle className="w-3 h-3" /> Flagged Leak
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

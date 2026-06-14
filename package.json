@@ -10,6 +10,7 @@
     "@capacitor/android": "^8.3.4",
     "@capacitor/core": "^8.3.4",
     "@capacitor/local-notifications": "^8.2.0",
+    "@capgo/capacitor-native-biometric": "^8.4.5",
     "cordova-plugin-sms": "^1.0.5",
     "lucide-react": "^0.263.1",
     "react": "^18.2.0",

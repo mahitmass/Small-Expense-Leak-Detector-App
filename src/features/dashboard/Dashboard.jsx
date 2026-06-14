@@ -1,5 +1,5 @@
 /* src/features/dashboard/Dashboard.jsx */
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { TrendingDown, AlertCircle, Wallet, Activity } from 'lucide-react';
 import { useExpenses } from '../../context/ExpenseContext';
 
@@ -10,7 +10,16 @@ import InsightsPanel from './InsightsPanel';
 import SubscriptionAlerts from './SubscriptionAlerts';
 
 const Dashboard = () => {
-  const { expenses, insights, setInsights, leakScore, handleAddExpense } = useExpenses();
+  // 🔥 UPDATED: Pulled syncForegroundSMS from global state context
+  const { expenses, insights, setInsights, leakScore, handleAddExpense, syncForegroundSMS } = useExpenses();
+
+  // 🔥 THE SILENT TRIGGER: Automatically updates ledger records on dashboard mount
+  useEffect(() => {
+    console.log("Dashboard loaded. Executing silent background bank SMS scan...");
+    if (typeof syncForegroundSMS === 'function') {
+      syncForegroundSMS();
+    }
+  }, [syncForegroundSMS]);
 
   const stats = useMemo(() => {
     const totalSpent = expenses.reduce((sum, item) => sum + item.amount, 0);
@@ -51,8 +60,6 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
         <div className="xl:col-span-4 space-y-4 xl:sticky xl:top-6 z-0">
           <LeakScoreCard leakScore={leakScore} />
-
-          {/* 🔥 THE WIDGET IS NOW ACTUALLY MOUNTED HERE */}
           <SubscriptionAlerts />
 
           <div className="bg-zinc-900 rounded-sm border border-zinc-800 shadow-xl">

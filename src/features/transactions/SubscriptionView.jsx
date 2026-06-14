@@ -1,73 +1,79 @@
 /* src/features/transactions/SubscriptionView.jsx */
 import React, { useMemo } from 'react';
-import { AlertTriangle, TrendingDown, CreditCard, Activity } from 'lucide-react';
+import { AlertTriangle, TrendingDown, CreditCard, Activity, Bug } from 'lucide-react';
+import { useExpenses } from '../../context/ExpenseContext';
+import { forceTestNotification } from '../../utils/notificationEngine';
 
 const SubscriptionView = ({ expenses }) => {
-  // 🔥 THE NEW ALGORITHM: Group, Count, and Flag
-  // 🔥 THE UPDATED ALGORITHM: Group, Count, and Flag (No hiding!)
+  // 🔥 YOUR TIME TRAVEL INJECTOR
+  const { handleAddExpense } = useExpenses();
+
+  const injectPastData = () => {
+    const today = new Date();
+    const pastDate = new Date(today.getTime() - (31 * 24 * 60 * 60 * 1000));
+    const recentDate = new Date(today.getTime() - (1 * 24 * 60 * 60 * 1000));
+
+    handleAddExpense({ description: "NETFLIX_TEST", amount: 199, category: "subscriptions", date: pastDate.toISOString().split('T')[0] });
+    handleAddExpense({ description: "NETFLIX_TEST", amount: 199, category: "subscriptions", date: recentDate.toISOString().split('T')[0] });
+    console.log("Injected 31-day timeline data into SQLite.");
+  };
+
+  // 🔥 THE ALGORITHM: Group, Count, and Flag
   const { roster, totalAnnualCost, projectedSavings } = useMemo(() => {
     const groups = {};
-
-    // 🔥 FIX: Only process expenses where category is 'subscriptions'
     const subscriptionExpenses = expenses.filter(exp => exp.category === 'subscriptions');
 
     subscriptionExpenses.forEach(exp => {
       const name = exp.description.trim().toUpperCase();
-      
       if (!groups[name]) {
-        groups[name] = { 
-          name: exp.description, 
-          count: 0, 
-          latestAmount: exp.amount, 
-          lastDate: exp.date 
-        };
+        groups[name] = { name: exp.description, count: 0, latestAmount: exp.amount, lastDate: exp.date };
       }
-      
       groups[name].count += 1;
       
-      // ... rest of your existing logic stays exactly the same
-      
-      // Keep the most recent amount and date
       if (new Date(exp.date) > new Date(groups[name].lastDate)) {
         groups[name].lastDate = exp.date;
         groups[name].latestAmount = exp.amount;
       }
     });
 
-    // 2. Treat ALL grouped expenses as part of the roster (Removed the count > 1 filter!)
     const activeSubs = Object.values(groups);
-
     let annualCostAcc = 0;
     let savingsAcc = 0;
 
-    // 3. Apply your threshold rule (Count >= 5)
     const analyzedRoster = activeSubs.map(sub => {
       const annual = sub.latestAmount * 12;
       annualCostAcc += annual;
 
       // The Magic Rule: Flag only if paid 5 or more times
       const isFlagged = sub.count >= 5;
-      
       if (isFlagged) {
         savingsAcc += annual;
       }
-
       return { ...sub, annualCost: annual, isFlagged };
     }).sort((a, b) => b.annualCost - a.annualCost);
 
-    return { 
-      roster: analyzedRoster, 
-      totalAnnualCost: annualCostAcc, 
-      projectedSavings: savingsAcc 
-    };
+    return { roster: analyzedRoster, totalAnnualCost: annualCostAcc, projectedSavings: savingsAcc };
   }, [expenses]);
 
   return (
-    <div className="pb-10">
-      
+    <div className="pb-10 space-y-4">
+      {/* 🔥 YOUR DEVELOPER DEBUG PANEL */}
+      <div className="bg-red-500/10 border border-red-500/30 rounded-sm p-4 shadow-xl">
+        <h3 className="text-xs font-bold text-red-400 uppercase flex items-center gap-2 mb-3">
+          <Bug className="w-4 h-4" /> System Test Tools
+        </h3>
+        <div className="flex gap-2">
+          <button onClick={forceTestNotification} className="bg-red-500/20 hover:bg-red-500/30 text-red-300 text-[10px] font-bold uppercase px-3 py-2 rounded-sm border border-red-500/30 transition-colors">
+            Ping Notification
+          </button>
+          <button onClick={injectPastData} className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[10px] font-bold uppercase px-3 py-2 rounded-sm border border-amber-500/30 transition-colors">
+            Inject 31-Day Sub
+          </button>
+        </div>
+      </div>
+
       {/* 💳 TOP DASHBOARD CARD */}
       <div className="bg-indigo-600 rounded-sm p-6 relative overflow-hidden mb-6 shadow-xl shadow-indigo-900/20">
-        {/* Decorative Background Chart */}
         <div className="absolute right-0 bottom-0 opacity-20 pointer-events-none">
           <svg width="200" height="100" viewBox="0 0 200 100" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M0 100L50 40L100 70L200 10" stroke="white" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round"/>
@@ -83,7 +89,6 @@ const SubscriptionView = ({ expenses }) => {
             </div>
           </div>
 
-          {/* 🔥 NEW SAVINGS METRIC (Only shows if there are flagged leaks) */}
           {projectedSavings > 0 && (
             <div className="bg-zinc-900/40 p-3 rounded-sm border border-emerald-500/20 backdrop-blur-sm">
               <p className="text-[10px] text-emerald-400 font-bold tracking-widest uppercase mb-1 flex items-center gap-1">
@@ -110,8 +115,6 @@ const SubscriptionView = ({ expenses }) => {
           ) : (
             roster.map((sub, index) => (
               <div key={index} className="p-5 hover:bg-zinc-900/30 transition-colors">
-                
-                {/* Main Subscription Header */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-sm bg-zinc-800 border border-zinc-700 flex items-center justify-center text-white font-black shadow-inner">
@@ -130,7 +133,6 @@ const SubscriptionView = ({ expenses }) => {
                   </div>
                 </div>
 
-                {/* 🔥 DYNAMIC WARNING: Only appears if count >= 5 */}
                 {sub.isFlagged ? (
                   <div className="ml-14 p-4 border border-red-900/50 bg-red-950/20 rounded-sm">
                     <div className="flex items-start gap-2 mb-3">
@@ -156,13 +158,11 @@ const SubscriptionView = ({ expenses }) => {
                     <Activity className="w-3 h-3" /> Still evaluating value (Need {5 - sub.count} more cycles)
                   </div>
                 )}
-
               </div>
             ))
           )}
         </div>
       </div>
-
     </div>
   );
 };
