@@ -1,32 +1,72 @@
-# Dependencies
-/node_modules
+# ========================
+# Node & Dependencies
+# ========================
+node_modules/
 /.pnp
 .pnp.js
 
-# Testing
-/coverage
-
-# Production
+# ========================
+# Production & Build
+# ========================
 /build
+/dist
 
-# Capacitor Android & Gradle Build Artifacts to Ignore
+# ========================
+# IDE & Editor Caches (The Ultimate Shield)
+# ========================
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ========================
+# Capacitor Android & Gradle
+# ========================
 android/app/build/
 android/.gradle/
 android/local.properties
 android/captures/
-android/.idea/
 android/app/app.iml
 android/android.iml
 .gradle/
 capacitor.config.json.timestamp-*
 
-# Misc
-.DS_Store
+# ========================
+# Capacitor iOS (Future-Proofing for Dwij's Mac)
+# ========================
+ios/App/App/xcuserdata/
+ios/App/Pods/
+ios/App/App.xcworkspace/xcuserdata/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+xcuserdata/
+
+# ========================
+# Security & Env Variables
+# ========================
+.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
+# ========================
+# OS Misc & Logs
+# ========================
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+/coverage
