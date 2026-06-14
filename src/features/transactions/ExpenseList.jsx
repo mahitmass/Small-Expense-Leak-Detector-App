@@ -1,30 +1,29 @@
 /* src/features/transactions/ExpenseList.jsx */
 import React from 'react';
-import { Coffee, Smartphone, CreditCard, Moon, Sun, ShoppingBag, Map, Trash2, HeartPulse, GraduationCap, Zap, Landmark } from 'lucide-react';
+import { Coffee, Smartphone, CreditCard, Moon, Sun, ShoppingBag, Map, Trash2, HeartPulse, GraduationCap, Zap, Landmark, RefreshCw } from 'lucide-react';
+import { useExpenses } from '../../context/ExpenseContext';
 
 const ExpenseList = ({ expenses, onDelete }) => {
+  const { syncForegroundSMS, handleDeleteExpense } = useExpenses();
   const LEAK_CATEGORIES = ["food", "subscription", "shopping", "transport", "entertainment", "snacks"];
 
   const getCategoryDetails = (category) => {
     switch (category) {
-      // Original Categories
       case 'food': return { icon: <Coffee className="w-4 h-4" />, color: 'text-amber-500', bg: 'bg-amber-500/10', border: 'border-amber-500/20' };
       case 'snacks': return { icon: <Coffee className="w-4 h-4" />, color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/20' };
       case 'subscription': return { icon: <Smartphone className="w-4 h-4" />, color: 'text-indigo-500', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20' };
       case 'transport': return { icon: <Map className="w-4 h-4" />, color: 'text-blue-500', bg: 'bg-blue-500/10', border: 'border-blue-500/20' };
       case 'shopping': return { icon: <ShoppingBag className="w-4 h-4" />, color: 'text-pink-500', bg: 'bg-pink-500/10', border: 'border-pink-500/20' };
       case 'entertainment': return { icon: <CreditCard className="w-4 h-4" />, color: 'text-violet-500', bg: 'bg-violet-500/10', border: 'border-violet-500/20' };
-      
-      // 🔥 RESTORED CATEGORIES (Upgraded to Lucide Icons)
       case 'healthcare': return { icon: <HeartPulse className="w-4 h-4" />, color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' };
       case 'education': return { icon: <GraduationCap className="w-4 h-4" />, color: 'text-cyan-500', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20' };
       case 'bills': return { icon: <Zap className="w-4 h-4" />, color: 'text-yellow-500', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20' };
       case 'investment': return { icon: <Landmark className="w-4 h-4" />, color: 'text-green-500', bg: 'bg-green-500/10', border: 'border-green-500/20' };
-      
       default: return { icon: <CreditCard className="w-4 h-4" />, color: 'text-zinc-400', bg: 'bg-[#0a0a0a]', border: 'border-zinc-800' };
     }
   };
 
+  // 🔥 RESTORED: Fully Polished Empty-State Icon/Message Design
   if (expenses.length === 0) {
     return (
       <div className="text-center py-12 border border-zinc-800 border-dashed rounded-sm bg-[#0a0a0a]">
@@ -39,9 +38,15 @@ const ExpenseList = ({ expenses, onDelete }) => {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-bold text-white uppercase tracking-wider">History</h2>
-        <span className="text-[9px] font-bold tracking-widest uppercase text-zinc-500 bg-[#0a0a0a] border border-zinc-800 px-2 py-1 rounded-sm">
+      {/* NEW UTILITY ACTION BAR */}
+      <div className="flex items-center justify-between mb-4 bg-zinc-900/50 p-2 border border-zinc-800 rounded-sm">
+        <button 
+          onClick={syncForegroundSMS}
+          className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-sm transition-colors shadow-md"
+        >
+          <RefreshCw className="w-3 h-3" /> Sync Bank SMS
+        </button>
+        <span className="text-[9px] font-bold tracking-widest uppercase text-zinc-400 bg-black px-2 py-1.5 border border-zinc-800 rounded-sm">
           {expenses.length} Records
         </span>
       </div>
@@ -51,12 +56,13 @@ const ExpenseList = ({ expenses, onDelete }) => {
           const style = getCategoryDetails(expense.category);
           const isLeak = LEAK_CATEGORIES.includes(expense.category);
           
-          // 🔥 RESTORED LOGIC: Only show Day/Night for Food and Snacks
+          // 🔥 RESTORED: Day/Night evaluation limits
           const showTime = ['food', 'snacks'].includes(expense.category);
           
           return (
             <div 
               key={expense.id} 
+              // 🔥 RESTORED: Complete Interactive Animation Transition and Hover States
               className={`flex items-center justify-between p-3.5 rounded-sm transition-all group border ${
                 isLeak 
                   ? 'bg-red-500/5 border-red-500/20 hover:border-red-500/40' 
@@ -70,6 +76,7 @@ const ExpenseList = ({ expenses, onDelete }) => {
                 <div>
                   <h3 className="text-sm font-bold text-zinc-200 flex items-center gap-2 uppercase tracking-wide">
                     {expense.description}
+                    {/* 🔥 RESTORED: The Crimson High-Visibility Leak Badge */}
                     {isLeak && (
                       <span className="text-[8px] font-black bg-red-500 text-white px-1.5 py-0.5 rounded-sm uppercase tracking-widest">
                         Leak
@@ -86,11 +93,12 @@ const ExpenseList = ({ expenses, onDelete }) => {
               
               <div className="flex items-center gap-4">
                 <div className="text-right">
+                  {/* 🔥 RESTORED: Clean Float Rounding Rules */}
                   <div className={`text-sm font-black ${isLeak ? 'text-red-500' : 'text-zinc-300'}`}>
                     ₹{expense.amount.toFixed(0)}
                   </div>
                   
-                  {/* 🔥 RESTORED LOGIC: Conditional Render Time Icon */}
+                  {/* 🔥 RESTORED: Conditional Render Time Icons */}
                   {showTime && (
                     <div className="flex items-center justify-end gap-1 text-[9px] font-bold uppercase tracking-widest text-zinc-500 mt-0.5">
                        {expense.time === 'night' ? <Moon className="w-2.5 h-2.5 text-indigo-400" /> : <Sun className="w-2.5 h-2.5 text-amber-500" />}
@@ -100,7 +108,7 @@ const ExpenseList = ({ expenses, onDelete }) => {
                 </div>
 
                 <button 
-                  onClick={() => onDelete && onDelete(expense.id)}
+                  onClick={() => handleDeleteExpense(expense.id)} 
                   className="p-2 text-zinc-600 hover:text-red-500 hover:bg-red-500/10 rounded-sm transition-colors"
                   title="Delete transaction"
                 >

@@ -1,8 +1,15 @@
 import { LocalNotifications } from '@capacitor/local-notifications';
 
-// Ask the user for permission when the app opens
 export const initializeNotifications = async () => {
     try {
+        // 🔥 FIX: Check existing status first so we don't annoy the user
+        const currentStatus = await LocalNotifications.checkPermissions();
+        
+        if (currentStatus.display === 'granted') {
+            return true;
+        }
+
+        // Only request if we don't have it yet
         const { display } = await LocalNotifications.requestPermissions();
         if (display !== 'granted') {
             console.warn("User denied push notification permissions.");
@@ -15,7 +22,27 @@ export const initializeNotifications = async () => {
     }
 };
 
-// The function to actually trigger the native lock-screen buzz
+// 🔥 THE BRUTE-FORCE TEST PING
+export const forceTestNotification = async () => {
+    try {
+        console.log("Triggering test notification...");
+        await LocalNotifications.schedule({
+            notifications: [
+                {
+                    title: "🔔 Test Connection Live",
+                    body: "Native notifications are fully connected to Capacitor!",
+                    id: 888,
+                    schedule: { at: new Date(Date.now() + 1000) },
+                    smallIcon: "ic_launcher" // Changed to the guaranteed default icon
+                }
+            ]
+        });
+        console.log("Test scheduled successfully.");
+    } catch (error) {
+        console.error("Notification crash:", error);
+    }
+};
+
 export const fireLeakWarning = async (merchant, amount, currentTotal, limit) => {
     try {
         await LocalNotifications.schedule({
@@ -23,9 +50,10 @@ export const fireLeakWarning = async (merchant, amount, currentTotal, limit) => 
                 {
                     title: "⚠️ Daily Leak Limit Exceeded",
                     body: `₹${amount} at ${merchant} pushed you to ₹${currentTotal} today (Limit: ₹${limit}).`,
-                    id: new Date().getTime(), 
-                    schedule: { at: new Date(Date.now() + 1000) }, // Fire exactly 1 second from now
-                    smallIcon: "ic_stat_icon_config_sample", 
+                    // 🔥 THE FIX: Generates a safe 6-digit number well below the Java Integer limit
+                    id: Math.floor(Math.random() * 999999), 
+                    schedule: { at: new Date(Date.now() + 1000) },
+                    smallIcon: "ic_launcher"
                 }
             ]
         });

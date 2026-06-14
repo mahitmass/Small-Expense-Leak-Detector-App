@@ -1,92 +1,61 @@
 /* src/context/AuthContext.js */
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { getDB } from '../utils/db';
-import { Capacitor } from '@capacitor/core';
 
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-    const [currentUser, setCurrentUser] = useState(null);
-    const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null); 
+  const [loading, setLoading] = useState(true);
+  const [hasPin, setHasPin] = useState(false);
 
-    useEffect(() => {
-        const savedUser = localStorage.getItem('active_user');
-        if (savedUser) {
-            setCurrentUser(JSON.parse(savedUser));
-        }
-        setLoading(false);
-    }, []);
+  useEffect(() => {
+    const savedPin = localStorage.getItem('device_mpin');
+    if (savedPin) {
+      setHasPin(true);
+    }
+    setLoading(false);
+  }, []);
 
-    const handleSignUp = async (name, username, password) => {
-        // 🔥 WEB BYPASS: Mock the database for Vercel testing
-        if (Capacitor.getPlatform() === 'web') {
-            const user = { name, username };
-            setCurrentUser(user);
-            localStorage.setItem('active_user', JSON.stringify(user));
-            return { success: true };
-        }
+  // 🔥 UPDATED: Now saves your actual name!
+  const createPin = (pin, name) => {
+    const finalName = name.trim() || 'Boss'; // Fallback just in case
+    localStorage.setItem('device_mpin', pin);
+    localStorage.setItem('device_owner_name', finalName);
+    setHasPin(true);
+    setCurrentUser({ name: finalName }); 
+  };
 
-        const db = getDB();
-        if (!db) return { success: false, error: "Database not ready" };
+  // 🔥 UPDATED: Retrieves your name instead of hardcoding 'Owner'
+  const unlockWithPin = (pin) => {
+    const savedPin = localStorage.getItem('device_mpin');
+    const savedName = localStorage.getItem('device_owner_name') || 'Boss';
+    
+    if (savedPin === pin) {
+      setCurrentUser({ name: savedName }); 
+      return true;
+    }
+    return false;
+  };
 
-        try {
-            const queryStr = `INSERT INTO users (name, username, password) VALUES (?, ?, ?)`;
-            await db.run(queryStr, [name, username.toLowerCase().trim(), password]);
-            
-            const user = { name, username };
-            setCurrentUser(user);
-            localStorage.setItem('active_user', JSON.stringify(user));
-            return { success: true };
-        } catch (error) {
-            console.error("Signup error:", error);
-            return { success: false, error: "Username already exists or invalid!" };
-        }
-    };
+  const handleLogout = () => {
+    setCurrentUser(null); 
+  };
 
-    const handleSignIn = async (username, password) => {
-        // 🔥 WEB BYPASS: Mock the database for Vercel testing
-        if (Capacitor.getPlatform() === 'web') {
-            const user = { name: "Web Tester", username };
-            setCurrentUser(user);
-            localStorage.setItem('active_user', JSON.stringify(user));
-            return { success: true };
-        }
-
-        const db = getDB();
-        if (!db) return { success: false, error: "Database not ready" };
-
-        try {
-            const res = await db.query(
-                `SELECT * FROM users WHERE username = ? AND password = ?`,
-                [username.toLowerCase().trim(), password]
-            );
-
-            if (res.values && res.values.length > 0) {
-                const matchedUser = res.values[0];
-                const user = { name: matchedUser.name, username: matchedUser.username };
-                setCurrentUser(user);
-                localStorage.setItem('active_user', JSON.stringify(user));
-                return { success: true };
-            } else {
-                return { success: false, error: "Invalid username or password" };
-            }
-        } catch (error) {
-            console.error("Signin error:", error);
-            return { success: false, error: "Authentication system error" };
-        }
-    };
-
-    const handleLogout = () => {
-        setCurrentUser(null);
-        localStorage.removeItem('active_user');
-    };
-
-    return (
-        <AuthContext.Provider value={{ currentUser, loading, handleSignIn, handleSignUp, handleLogout }}>
-            {children}
-        </AuthContext.Provider>
-    );
+  return (
+    <AuthContext.Provider value={{ 
+      currentUser, 
+      loading, 
+      hasPin, 
+      createPin, 
+      unlockWithPin, 
+      handleLogout 
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
-export const useAuth = () => useContext(AuthContext);
+export function useAuth() {
+  return useContext(AuthContext);
+}
 //yo

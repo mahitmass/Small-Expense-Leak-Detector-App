@@ -1,16 +1,50 @@
 /* src/components/Header.jsx */
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Zap, Bell, HeartPulse, User, X } from 'lucide-react';
 import { useExpenses } from '../context/ExpenseContext';
+import { useAuth } from '../context/AuthContext';
 
 const Header = () => {
   const { leakScore, activeTab, setActiveTab, insights } = useExpenses();
+  const { currentUser, handleLogout: contextLogout } = useAuth();
+  
   const [showNotifs, setShowNotifs] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  
+  // 🔥 ADDED: A reference sensor to detect clicks outside the menu
+  const profileMenuRef = useRef(null);
+
+  // 🔥 ADDED: The click-outside listener
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // If the menu is open, AND the click happened outside of our ref, close it
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    // Attach the listener to the whole document
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    // Cleanup the listener when the component unmounts
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const getHealthStatus = (score) => {
     if (score >= 80) return { label: 'Excellent', color: 'text-emerald-400', icon: <HeartPulse className="text-emerald-400" size={16} /> };
     if (score >= 50) return { label: 'Stable', color: 'text-amber-400', icon: <HeartPulse className="text-amber-400" size={16} /> };
     return { label: 'Critical', color: 'text-red-500', icon: <HeartPulse className="text-red-500" size={16} /> };
+  };
+
+  const handleLocalLogout = () => {
+    setShowProfileMenu(false);
+    
+    // Call the function directly from your context!
+    if (contextLogout) {
+      contextLogout(); 
+    }
   };
 
   const status = getHealthStatus(leakScore);
@@ -74,13 +108,36 @@ const Header = () => {
             )}
           </div>
           
-          <div className="w-9 h-9 rounded-lg bg-zinc-800 flex items-center justify-center border border-zinc-700">
-             <User className="w-4 h-4 text-zinc-300" />
+          {/* 🔥 PROFILE DROPDOWN WITH REF SENSOR */}
+          <div className="relative" ref={profileMenuRef}>
+            <button 
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+              className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center border border-zinc-700 hover:bg-zinc-700 transition-colors focus:outline-none"
+            >
+               <User className="w-4 h-4 text-zinc-300" />
+            </button>
+
+            {showProfileMenu && (
+              <div className="absolute right-0 mt-3 w-52 bg-[#0a0a0a] border border-zinc-800 rounded-lg shadow-2xl overflow-hidden z-[200]">
+                <div className="px-4 py-3 border-b border-zinc-800 bg-zinc-900/30">
+                  <p className="text-sm font-bold text-white tracking-wide">{currentUser?.name || 'User'}</p>
+                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Local Vault Active</p>
+                </div>
+                <button 
+                  onClick={handleLocalLogout}
+                  className="w-full text-left px-4 py-3 text-xs text-red-400 hover:bg-zinc-900 transition-colors font-bold tracking-widest uppercase flex items-center gap-2"
+                >
+                  {/* 🔥 Renamed to Logout */}
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
+
         </div>
       </div>
       
-      {/* DESKTOP Navigation Tabs (Hidden on Mobile) */}
+      {/* DESKTOP Navigation Tabs */}
       <nav className="hidden md:flex gap-2 p-1 bg-zinc-900 border border-zinc-800 rounded-lg w-max">
         {[
           { id: 'dashboard', label: 'Dashboard' },

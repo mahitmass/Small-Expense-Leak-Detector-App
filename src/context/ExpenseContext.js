@@ -2,8 +2,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { categorizeTransaction, calculateLeakAnalysis, generateSmartInsights, evaluateDailyLeaks } from '../utils/leakLogic';
 import { getDB } from '../utils/db'; 
-// 🔥 RESTORED: The subscription engine import
 import { scanForSubscriptions } from '../utils/subscriptionScanner'; 
+// 🔥 DWIJ'S NEW IMPORT: The Sync Engine
+import { syncNotification } from '../utils/notificationSync'; 
 
 const ExpenseContext = createContext();
 
@@ -14,44 +15,50 @@ export function ExpenseProvider({ children }) {
   const [monthlyIncome, setMonthlyIncome] = useState(0);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showSalaryModal, setShowSalaryModal] = useState(true);
-  
-  // 🔥 RESTORED: The subscription state
   const [upcomingSubscriptions, setUpcomingSubscriptions] = useState([]);
 
-  // INITIAL LOAD: Fetch data from SQLite when the app boots
-  useEffect(() => {
-    const loadData = async () => {
-      const db = getDB();
-      if (db) {
-        try {
-          const res = await db.query(`SELECT * FROM transactions ORDER BY date DESC`);
-          
-          let dbExpenses = [];
-          if (res.values && res.values.length > 0) {
-            dbExpenses = res.values.map(row => ({
-              id: row.id,
-              amount: row.amount,
-              description: row.merchant,
-              date: row.date,
-              category: row.category,
-              type: row.type
-            }));
-          }
-
-          setExpenses(dbExpenses);
-          runAnalysis(dbExpenses, monthlyIncome);
-
-          // 🔥 RESTORED: Run the subscription scanner on boot
-          const predicted = scanForSubscriptions(dbExpenses);
-          setUpcomingSubscriptions(predicted);
-
-        } catch (error) {
-          console.error("❌ Failed to load from SQLite:", error);
+  // 1. YOUR PROTECTED DATA LOADER (Keeps the id DESC sorting fix!)
+  const loadData = async () => {
+    const db = getDB();
+    if (db) {
+      try {
+        const res = await db.query(`SELECT * FROM transactions ORDER BY date DESC, id DESC`);
+        
+        let dbExpenses = [];
+        if (res.values && res.values.length > 0) {
+          dbExpenses = res.values.map(row => ({
+            id: row.id,
+            amount: row.amount,
+            description: row.merchant,
+            date: row.date,
+            category: row.category,
+            type: row.type,
+            time: row.time || 'day'
+          }));
         }
+
+        setExpenses(dbExpenses);
+        runAnalysis(dbExpenses, monthlyIncome);
+        setUpcomingSubscriptions(scanForSubscriptions(dbExpenses));
+      } catch (error) {
+        console.error("❌ Failed to load from SQLite:", error);
       }
-    };
+    }
+  };
+
+  // INITIAL AUTO-LOAD ON BOOT
+  useEffect(() => {
     loadData();
   }, [monthlyIncome]);
+
+  // 🔥 DWIJ'S NEW: The Master Alert Function (Fires Android Push + Updates Bell Icon)
+  const dispatchAlert = async (title, message) => {
+    await syncNotification(Date.now(), title, message, (newAlert) => {
+      // We tag it as 'isDynamic' so it doesn't get erased by static analysis
+      const finalAlert = { ...newAlert, isDynamic: true };
+      setInsights(prev => [finalAlert, ...prev]);
+    });
+  };
 
   const runAnalysis = (currentExpenses, income) => {
     const safeIncome = income || monthlyIncome;
@@ -64,48 +71,49 @@ export function ExpenseProvider({ children }) {
     }, {});
     
     const newInsights = generateSmartInsights(currentExpenses, totals);
-    setInsights(newInsights);
+    
+    // 🔥 DWIJ'S FIX: Merge the new static insights with dynamic Android alerts
+    setInsights(prev => {
+      const dynamicAlerts = prev.filter(p => p.isDynamic);
+      return [...dynamicAlerts, ...newInsights];
+    });
   };
 
+  // YOUR PROTECTED SALARY LOGIC
   const handleSalarySubmit = (income) => {
-    setMonthlyIncome(income);
+    const strictInt = Math.floor(Number(income)); 
+    setMonthlyIncome(strictInt);
     setShowSalaryModal(false);
-    runAnalysis(expenses, income);
+    runAnalysis(expenses, strictInt);
   };
 
-  // UPDATE: Save single expense to SQLite
   const handleAddExpense = async (newExpense) => {
-    // 1. Ensure category is set
     if (!newExpense.category || newExpense.category === 'misc') {
       newExpense.category = categorizeTransaction(newExpense.description);
     }
     
-    // 2. Save to SQLite Database
     const db = getDB();
     if (db) {
       try {
-        const query = `INSERT INTO transactions (amount, merchant, date, category, type, unique_hash) VALUES (?, ?, ?, ?, ?, ?)`;
+        const query = `INSERT OR IGNORE INTO transactions (amount, merchant, date, category, type, unique_hash) VALUES (?, ?, ?, ?, ?, ?)`;
         const hash = `${newExpense.description}-${newExpense.amount}-${newExpense.date}`; 
         await db.run(query, [newExpense.amount, newExpense.description, newExpense.date, newExpense.category, 'debit', hash]);
+        await loadData(); 
       } catch (err) {
         console.error("SQLite Insert Error:", err);
       }
     }
 
-    // 3. THE DAILY LEAK MONITOR 
+    // 🔥 DWIJ'S NEW DAILY LEAK MONITOR 
     const dailyLeakLimit = 500; 
-    evaluateDailyLeaks(newExpense, expenses, dailyLeakLimit);
-
-    // 4. Update UI and State
-    const updated = [newExpense, ...expenses];
-    setExpenses(updated);
-    runAnalysis(updated, monthlyIncome);
+    const leakWarning = evaluateDailyLeaks(newExpense, expenses, dailyLeakLimit);
     
-    // 5. Update subscriptions in case the new expense was a recurring one
-    setUpcomingSubscriptions(scanForSubscriptions(updated));
+    if (leakWarning) {
+      const msg = typeof leakWarning === 'string' ? leakWarning : `You exceeded your ₹${dailyLeakLimit} daily limit!`;
+      dispatchAlert("Daily Leak Alert 🚨", msg);
+    }
   };
 
-  // Bulk save to SQLite
   const handleAddMultipleExpenses = async (newExpensesArray) => {
     const db = getDB();
     if (db) {
@@ -116,15 +124,11 @@ export function ExpenseProvider({ children }) {
           const query = `INSERT OR IGNORE INTO transactions (amount, merchant, date, category, type, unique_hash) VALUES (?, ?, ?, ?, ?, ?)`;
           await db.run(query, [exp.amount, exp.description, exp.date, cat, 'debit', hash]);
         }
+        await loadData();
       } catch (err) {
         console.error("SQLite Bulk Insert Error:", err);
       }
     }
-
-    const updated = [...newExpensesArray, ...expenses];
-    setExpenses(updated);
-    runAnalysis(updated, monthlyIncome);
-    setUpcomingSubscriptions(scanForSubscriptions(updated));
   };
 
   const handleDeleteExpense = async (id) => {
@@ -132,24 +136,19 @@ export function ExpenseProvider({ children }) {
     if (db) {
       try {
         await db.run(`DELETE FROM transactions WHERE id = ?`, [id]);
+        await loadData();
       } catch (err) {
         console.error("SQLite Delete Error:", err);
       }
     }
-
-    const updated = expenses.filter(expense => expense.id !== id);
-    setExpenses(updated);
-    runAnalysis(updated, monthlyIncome);
-    setUpcomingSubscriptions(scanForSubscriptions(updated));
   };
 
   return (
     <ExpenseContext.Provider value={{
       expenses, insights, setInsights, leakScore, monthlyIncome, activeTab, setActiveTab,
-      showSalaryModal, setShowSalaryModal, 
-      upcomingSubscriptions, // 🔥 RESTORED: Exporting it to the app
-      handleSalarySubmit, handleAddExpense, 
-      handleAddMultipleExpenses, handleDeleteExpense
+      showSalaryModal, setShowSalaryModal, upcomingSubscriptions,
+      handleSalarySubmit, handleAddExpense, handleDeleteExpense, handleAddMultipleExpenses, 
+      dispatchAlert // 🔥 Exported for UI use
     }}>
       {children}
     </ExpenseContext.Provider>
