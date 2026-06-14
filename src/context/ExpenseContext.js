@@ -25,7 +25,9 @@ export function ExpenseProvider({ children }) {
       setNotifications(prev => [newAlert, ...prev]); 
     });
   };
-
+const deleteNotification = (id) => {
+    setNotifications(prev => prev.filter(notif => notif.id !== id));
+  };
   // 🔥 ADDED 'isBoot' SWITCH TO PREVENT SPAM
   const loadData = async (isBoot = false) => {
     const db = getDB();
@@ -170,12 +172,13 @@ export function ExpenseProvider({ children }) {
     <ExpenseContext.Provider value={{
       expenses, insights, setInsights, leakScore, monthlyIncome, activeTab, setActiveTab,
       showSalaryModal, setShowSalaryModal, upcomingSubscriptions,
-      notifications, setNotifications, // 🔥 Successfully exported here!
+      notifications, setNotifications, deleteNotification,// 🔥 Successfully exported here!
       handleSalarySubmit, handleAddExpense, handleDeleteExpense, handleAddMultipleExpenses, 
       dispatchAlert 
     }}>
       {children}
     </ExpenseContext.Provider>
+    
   );
 }
 

@@ -1,12 +1,13 @@
 /* src/components/Header.jsx */
 import React, { useState, useEffect, useRef } from 'react';
-import { Zap, Bell, HeartPulse, User, X } from 'lucide-react';
+// 🔥 1. Added Trash2 to your icons!
+import { Zap, Bell, HeartPulse, User, X, Trash2 } from 'lucide-react';
 import { useExpenses } from '../context/ExpenseContext';
 import { useAuth } from '../context/AuthContext';
 
 const Header = () => {
-  // 🔥 1. Swapped 'insights' for 'notifications'
-  const { leakScore, activeTab, setActiveTab, notifications } = useExpenses();
+  // 🔥 2. Pulled in your new deleteNotification function
+  const { leakScore, activeTab, setActiveTab, notifications, deleteNotification } = useExpenses();
   const { currentUser, handleLogout: contextLogout } = useAuth();
   
   const [showNotifs, setShowNotifs] = useState(false);
@@ -36,15 +37,12 @@ const Header = () => {
 
   const handleLocalLogout = () => {
     setShowProfileMenu(false);
-    
     if (contextLogout) {
       contextLogout(); 
     }
   };
 
   const status = getHealthStatus(leakScore);
-  
-  // 🔥 2. Now tracking the length of the new notifications array
   const unreadCount = notifications ? notifications.length : 0;
 
   return (
@@ -86,18 +84,31 @@ const Header = () => {
             {showNotifs && (
               <div className="absolute right-0 mt-3 w-[90vw] max-w-[320px] origin-top-right bg-zinc-900 border border-zinc-800 rounded-sm shadow-2xl z-[150] overflow-hidden">
                 <div className="p-3 border-b border-zinc-800 flex justify-between items-center bg-[#0a0a0a]">
-                  <span className="font-bold text-white text-xs uppercase tracking-wider">Smart Alerts</span>
+                  <span className="font-bold text-white text-xs uppercase tracking-wider">Notifications</span>
                   <button onClick={() => setShowNotifs(false)}><X className="w-4 h-4 text-zinc-500" /></button>
                 </div>
                 <div className="max-h-64 overflow-y-auto">
                   {unreadCount === 0 ? (
                     <div className="p-6 text-center text-xs font-semibold text-zinc-500">No active alerts. You're doing great!</div>
                   ) : (
-                    // 🔥 3. Mapping over the new notifications array!
                     notifications.map(notification => (
-                      <div key={notification.id} className="p-4 border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
-                        <p className="text-xs font-bold text-white mb-1">{notification.title}</p>
-                        <p className="text-[10px] text-zinc-400 leading-relaxed">{notification.message}</p>
+                      // 🔥 3. Added flexbox to align text left and button right
+                      <div key={notification.id} className="p-4 border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors flex justify-between items-start gap-3">
+                        <div className="flex-1">
+                          <p className="text-xs font-bold text-white mb-1">{notification.title}</p>
+                          <p className="text-[10px] text-zinc-400 leading-relaxed">{notification.message}</p>
+                        </div>
+                        {/* 🔥 4. The sleek Delete Button */}
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevents the dropdown from doing weird things when clicked
+                            deleteNotification(notification.id);
+                          }}
+                          className="p-1.5 text-zinc-600 hover:text-red-400 hover:bg-red-400/10 rounded-md transition-all shrink-0"
+                          title="Delete Alert"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     ))
                   )}
