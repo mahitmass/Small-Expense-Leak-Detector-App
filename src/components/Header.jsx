@@ -5,28 +5,24 @@ import { useExpenses } from '../context/ExpenseContext';
 import { useAuth } from '../context/AuthContext';
 
 const Header = () => {
-  const { leakScore, activeTab, setActiveTab, insights } = useExpenses();
+  // 🔥 1. Swapped 'insights' for 'notifications'
+  const { leakScore, activeTab, setActiveTab, notifications } = useExpenses();
   const { currentUser, handleLogout: contextLogout } = useAuth();
   
   const [showNotifs, setShowNotifs] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   
-  // 🔥 ADDED: A reference sensor to detect clicks outside the menu
   const profileMenuRef = useRef(null);
 
-  // 🔥 ADDED: The click-outside listener
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // If the menu is open, AND the click happened outside of our ref, close it
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
         setShowProfileMenu(false);
       }
     };
 
-    // Attach the listener to the whole document
     document.addEventListener('mousedown', handleClickOutside);
     
-    // Cleanup the listener when the component unmounts
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
@@ -41,14 +37,15 @@ const Header = () => {
   const handleLocalLogout = () => {
     setShowProfileMenu(false);
     
-    // Call the function directly from your context!
     if (contextLogout) {
       contextLogout(); 
     }
   };
 
   const status = getHealthStatus(leakScore);
-  const unreadCount = insights ? insights.length : 0;
+  
+  // 🔥 2. Now tracking the length of the new notifications array
+  const unreadCount = notifications ? notifications.length : 0;
 
   return (
     <header className="max-w-7xl mx-auto mb-6 relative z-[100]">
@@ -96,10 +93,11 @@ const Header = () => {
                   {unreadCount === 0 ? (
                     <div className="p-6 text-center text-xs font-semibold text-zinc-500">No active alerts. You're doing great!</div>
                   ) : (
-                    insights.map(insight => (
-                      <div key={insight.id} className="p-4 border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
-                        <p className="text-xs font-bold text-white mb-1">{insight.title}</p>
-                        <p className="text-[10px] text-zinc-400 leading-relaxed">{insight.message}</p>
+                    // 🔥 3. Mapping over the new notifications array!
+                    notifications.map(notification => (
+                      <div key={notification.id} className="p-4 border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
+                        <p className="text-xs font-bold text-white mb-1">{notification.title}</p>
+                        <p className="text-[10px] text-zinc-400 leading-relaxed">{notification.message}</p>
                       </div>
                     ))
                   )}
@@ -108,7 +106,7 @@ const Header = () => {
             )}
           </div>
           
-          {/* 🔥 PROFILE DROPDOWN WITH REF SENSOR */}
+          {/* PROFILE DROPDOWN WITH REF SENSOR */}
           <div className="relative" ref={profileMenuRef}>
             <button 
               onClick={() => setShowProfileMenu(!showProfileMenu)}
@@ -127,7 +125,6 @@ const Header = () => {
                   onClick={handleLocalLogout}
                   className="w-full text-left px-4 py-3 text-xs text-red-400 hover:bg-zinc-900 transition-colors font-bold tracking-widest uppercase flex items-center gap-2"
                 >
-                  {/* 🔥 Renamed to Logout */}
                   Logout
                 </button>
               </div>
