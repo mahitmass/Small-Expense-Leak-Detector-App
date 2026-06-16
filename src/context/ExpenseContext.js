@@ -11,7 +11,18 @@ const ExpenseContext = createContext();
 export function ExpenseProvider({ children }) {
   const [expenses, setExpenses] = useState([]); 
   const [insights, setInsights] = useState([]);
-  const [notifications, setNotifications] = useState([]); // 🔥 Your new inbox for Android alerts
+ const [notifications, setNotifications] = useState([]); 
+  
+  // 🔥 NEW: Budget State
+  const [monthlyBudget, setMonthlyBudget] = useState(() => {
+    const saved = localStorage.getItem('monthlyBudget');
+    return saved !== null ? Number(saved) : 0; // 0 will mean "No Limit"
+  });
+
+  const handleBudgetChange = (val) => {
+    setMonthlyBudget(val);
+    localStorage.setItem('monthlyBudget', val);
+  };
   const [leakScore, setLeakScore] = useState(0);
   const [monthlyIncome, setMonthlyIncome] = useState(0);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -116,26 +127,59 @@ const deleteNotification = (id) => {
       newExpense.category = categorizeTransaction(newExpense.description);
     }
     
+    let savedSuccessfully = false;
     const db = getDB();
+
     if (db) {
       try {
         const query = `INSERT OR IGNORE INTO transactions (amount, merchant, date, category, type, unique_hash) VALUES (?, ?, ?, ?, ?, ?)`;
         const hash = `${newExpense.description}-${newExpense.amount}-${newExpense.date}`; 
         await db.run(query, [newExpense.amount, newExpense.description, newExpense.date, newExpense.category, 'debit', hash]);
         
-        // Notice we don't pass 'true' here, so it won't spam the monthly alert!
         await loadData(); 
+        savedSuccessfully = true;
       } catch (err) {
-        console.error("SQLite Insert Error:", err);
+        console.error("🚨 SQLite Insert Error:", err);
       }
+    } else {
+      // 🔥 WEB BROWSER FALLBACK: 
+      // SQLite doesn't work on 'npm start'. This ensures your UI still updates locally!
+      const fallbackExpense = {
+        id: Date.now(),
+        amount: newExpense.amount,
+        description: newExpense.description,
+        date: newExpense.date,
+        category: newExpense.category,
+        type: 'debit',
+        time: 'day'
+      };
+      setExpenses(prev => [fallbackExpense, ...prev]);
+      runAnalysis([fallbackExpense, ...expenses], monthlyIncome);
+      savedSuccessfully = true;
     }
 
-    const dailyLeakLimit = 500; 
-    const leakWarning = evaluateDailyLeaks(newExpense, expenses, dailyLeakLimit);
-    
-    if (leakWarning) {
-      const msg = typeof leakWarning === 'string' ? leakWarning : `You exceeded your ₹${dailyLeakLimit} daily limit!`;
-      dispatchAlert("Daily Leak Alert 🚨", msg);
+    // 🔥 NEW: Smart Monthly Budget Logic (Replaces the 500 Daily Limit)
+    if (savedSuccessfully && monthlyBudget > 0) {
+      const now = new Date();
+      
+      // Calculate what the month's total WAS before this new expense
+      let previousMonthTotal = 0;
+      expenses.forEach(exp => {
+        const expDate = new Date(exp.date);
+        if (expDate.getMonth() === now.getMonth() && expDate.getFullYear() === now.getFullYear()) {
+          previousMonthTotal += exp.amount;
+        }
+      });
+
+      const newMonthTotal = previousMonthTotal + newExpense.amount;
+
+      // The Boundary Check: Only fire if THIS specific transaction pushed them over the limit!
+      if (previousMonthTotal <= monthlyBudget && newMonthTotal > monthlyBudget) {
+        dispatchAlert(
+          "Budget Exceeded! 🚨", 
+          `You exceeded your ₹${monthlyBudget} monthly budget!`
+        );
+      }
     }
   };
 
@@ -172,7 +216,8 @@ const deleteNotification = (id) => {
     <ExpenseContext.Provider value={{
       expenses, insights, setInsights, leakScore, monthlyIncome, activeTab, setActiveTab,
       showSalaryModal, setShowSalaryModal, upcomingSubscriptions,
-      notifications, setNotifications, deleteNotification,// 🔥 Successfully exported here!
+      notifications, setNotifications, deleteNotification,
+      monthlyBudget, handleBudgetChange, // 🔥 Exported here!
       handleSalarySubmit, handleAddExpense, handleDeleteExpense, handleAddMultipleExpenses, 
       dispatchAlert 
     }}>

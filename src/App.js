@@ -163,8 +163,6 @@ function App() {
 
   const simulateWebSync = () => {
     setTimeout(() => {
-      handleAddExpense({ description: 'Amazon Order', amount: 899, category: 'shopping', date: '2024-06-01', isContactPayment: false });
-      handleAddExpense({ description: 'UPI to Rahul', amount: 450, category: 'transfer', date: '2024-06-01', isContactPayment: true });
       localStorage.setItem("hasSyncedInbox", "true");
       setIsBooting(false); 
     }, 1500);
