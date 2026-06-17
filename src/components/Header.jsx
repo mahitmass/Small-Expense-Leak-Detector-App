@@ -1,32 +1,29 @@
 /* src/components/Header.jsx */
 import React, { useState, useEffect, useRef } from 'react';
-import { Zap, Bell, HeartPulse, User, X } from 'lucide-react';
+// 🔥 1. Added Trash2 to your icons!
+import { Zap, Bell, HeartPulse, User, X, Trash2 } from 'lucide-react';
 import { useExpenses } from '../context/ExpenseContext';
 import { useAuth } from '../context/AuthContext';
 
 const Header = () => {
-  const { leakScore, activeTab, setActiveTab, insights } = useExpenses();
+  // 🔥 2. Pulled in your new deleteNotification function
+  const { leakScore, activeTab, setActiveTab, notifications, deleteNotification } = useExpenses();
   const { currentUser, handleLogout: contextLogout } = useAuth();
   
   const [showNotifs, setShowNotifs] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   
-  // 🔥 ADDED: A reference sensor to detect clicks outside the menu
   const profileMenuRef = useRef(null);
 
-  // 🔥 ADDED: The click-outside listener
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // If the menu is open, AND the click happened outside of our ref, close it
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
         setShowProfileMenu(false);
       }
     };
 
-    // Attach the listener to the whole document
     document.addEventListener('mousedown', handleClickOutside);
     
-    // Cleanup the listener when the component unmounts
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
@@ -40,15 +37,13 @@ const Header = () => {
 
   const handleLocalLogout = () => {
     setShowProfileMenu(false);
-    
-    // Call the function directly from your context!
     if (contextLogout) {
       contextLogout(); 
     }
   };
 
   const status = getHealthStatus(leakScore);
-  const unreadCount = insights ? insights.length : 0;
+  const unreadCount = notifications ? notifications.length : 0;
 
   return (
     <header className="max-w-7xl mx-auto mb-6 relative z-[100]">
@@ -89,17 +84,31 @@ const Header = () => {
             {showNotifs && (
               <div className="absolute right-0 mt-3 w-[90vw] max-w-[320px] origin-top-right bg-zinc-900 border border-zinc-800 rounded-sm shadow-2xl z-[150] overflow-hidden">
                 <div className="p-3 border-b border-zinc-800 flex justify-between items-center bg-[#0a0a0a]">
-                  <span className="font-bold text-white text-xs uppercase tracking-wider">Smart Alerts</span>
+                  <span className="font-bold text-white text-xs uppercase tracking-wider">Notifications</span>
                   <button onClick={() => setShowNotifs(false)}><X className="w-4 h-4 text-zinc-500" /></button>
                 </div>
                 <div className="max-h-64 overflow-y-auto">
                   {unreadCount === 0 ? (
                     <div className="p-6 text-center text-xs font-semibold text-zinc-500">No active alerts. You're doing great!</div>
                   ) : (
-                    insights.map(insight => (
-                      <div key={insight.id} className="p-4 border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
-                        <p className="text-xs font-bold text-white mb-1">{insight.title}</p>
-                        <p className="text-[10px] text-zinc-400 leading-relaxed">{insight.message}</p>
+                    notifications.map(notification => (
+                      // 🔥 3. Added flexbox to align text left and button right
+                      <div key={notification.id} className="p-4 border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors flex justify-between items-start gap-3">
+                        <div className="flex-1">
+                          <p className="text-xs font-bold text-white mb-1">{notification.title}</p>
+                          <p className="text-[10px] text-zinc-400 leading-relaxed">{notification.message}</p>
+                        </div>
+                        {/* 🔥 4. The sleek Delete Button */}
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevents the dropdown from doing weird things when clicked
+                            deleteNotification(notification.id);
+                          }}
+                          className="p-1.5 text-zinc-600 hover:text-red-400 hover:bg-red-400/10 rounded-md transition-all shrink-0"
+                          title="Delete Alert"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     ))
                   )}
@@ -108,7 +117,7 @@ const Header = () => {
             )}
           </div>
           
-          {/* 🔥 PROFILE DROPDOWN WITH REF SENSOR */}
+          {/* PROFILE DROPDOWN WITH REF SENSOR */}
           <div className="relative" ref={profileMenuRef}>
             <button 
               onClick={() => setShowProfileMenu(!showProfileMenu)}
@@ -127,7 +136,6 @@ const Header = () => {
                   onClick={handleLocalLogout}
                   className="w-full text-left px-4 py-3 text-xs text-red-400 hover:bg-zinc-900 transition-colors font-bold tracking-widest uppercase flex items-center gap-2"
                 >
-                  {/* 🔥 Renamed to Logout */}
                   Logout
                 </button>
               </div>

@@ -8,6 +8,10 @@ import LeakScoreCard from './LeakScoreCard';
 import CategoryBreakdown from './CategoryBreakdown';
 import InsightsPanel from './InsightsPanel';
 import SubscriptionAlerts from './SubscriptionAlerts';
+import BudgetSlider from '../../components/BudgetSlider';
+
+// Inside your component render:
+<BudgetSlider />
 
 const Dashboard = () => {
   // 🔥 UPDATED: Pulled syncForegroundSMS from global state context
@@ -41,6 +45,10 @@ const Dashboard = () => {
   return (
     <div className="space-y-4 animate-fade-in">
       {/* Top Stats Row */}
+      {/* Drop this wherever you want the slider to appear! */}
+      <div className="mb-8 mt-4">
+        <BudgetSlider />
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {metrics.map(metric => (
           <div key={metric.title} className="bg-zinc-900 p-5 rounded-sm border border-zinc-800 shadow-[0_0_15px_rgba(0,0,0,0.5)] group">

@@ -1,9 +1,9 @@
 /* src/context/ExpenseContext.js */
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { categorizeTransaction, calculateLeakAnalysis, generateSmartInsights, evaluateDailyLeaks } from '../utils/leakLogic';
+// 🔥 Cleaned up imports so everything is merged perfectly
+import { categorizeTransaction, calculateLeakAnalysis, generateSmartInsights, evaluateDailyLeaks, calculateMonthlySavings } from '../utils/leakLogic';
 import { getDB } from '../utils/db'; 
 import { scanForSubscriptions } from '../utils/subscriptionScanner'; 
-// 🔥 DWIJ'S NEW IMPORT: The Sync Engine
 import { syncNotification } from '../utils/notificationSync'; 
 
 const ExpenseContext = createContext();
@@ -11,14 +11,36 @@ const ExpenseContext = createContext();
 export function ExpenseProvider({ children }) {
   const [expenses, setExpenses] = useState([]); 
   const [insights, setInsights] = useState([]);
+ const [notifications, setNotifications] = useState([]); 
+  
+  // 🔥 NEW: Budget State
+  const [monthlyBudget, setMonthlyBudget] = useState(() => {
+    const saved = localStorage.getItem('monthlyBudget');
+    return saved !== null ? Number(saved) : 0; // 0 will mean "No Limit"
+  });
+
+  const handleBudgetChange = (val) => {
+    setMonthlyBudget(val);
+    localStorage.setItem('monthlyBudget', val);
+  };
   const [leakScore, setLeakScore] = useState(0);
   const [monthlyIncome, setMonthlyIncome] = useState(0);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showSalaryModal, setShowSalaryModal] = useState(true);
   const [upcomingSubscriptions, setUpcomingSubscriptions] = useState([]);
 
-  // 1. YOUR PROTECTED DATA LOADER (Keeps the id DESC sorting fix!)
-  const loadData = async () => {
+  // 🔥 THE MASTER ALERT FUNCTION
+  const dispatchAlert = async (title, message) => {
+    await syncNotification(Date.now(), title, message, (newAlert) => {
+      // Pushes directly to the new notifications bucket instead of mixing with insights
+      setNotifications(prev => [newAlert, ...prev]); 
+    });
+  };
+const deleteNotification = (id) => {
+    setNotifications(prev => prev.filter(notif => notif.id !== id));
+  };
+  // 🔥 ADDED 'isBoot' SWITCH TO PREVENT SPAM
+  const loadData = async (isBoot = false) => {
     const db = getDB();
     if (db) {
       try {
@@ -39,7 +61,32 @@ export function ExpenseProvider({ children }) {
 
         setExpenses(dbExpenses);
         runAnalysis(dbExpenses, monthlyIncome);
-        setUpcomingSubscriptions(scanForSubscriptions(dbExpenses));
+        
+        const predicted = scanForSubscriptions(dbExpenses);
+        setUpcomingSubscriptions(predicted);
+
+        // 🔥 FIRE THESE ONLY WHEN THE APP OPENS (Not every time you add an expense)
+        if (isBoot) {
+          // 1. Subscription Alerts
+          predicted.forEach(sub => {
+             if (sub.count >= 5) {
+                dispatchAlert(
+                  "Subscription Leak! 🚨", 
+                  `You've paid for ${sub.name} 5 times. Are you still using it?`
+                );
+             }
+          });
+
+          // 2. Monthly Savings Alerts
+          const monthlyStats = calculateMonthlySavings(dbExpenses);
+          if (monthlyStats.hasSavings) {
+             dispatchAlert(
+               "Great Job Saving! 📈", 
+               `You spent ₹${monthlyStats.lastMonthTotal} last month, but only ₹${monthlyStats.thisMonthTotal} this month. You saved ₹${monthlyStats.savings}!`
+             );
+          }
+        }
+
       } catch (error) {
         console.error("❌ Failed to load from SQLite:", error);
       }
@@ -48,17 +95,9 @@ export function ExpenseProvider({ children }) {
 
   // INITIAL AUTO-LOAD ON BOOT
   useEffect(() => {
-    loadData();
+    // Pass 'true' here so the alerts know it's safe to fire!
+    loadData(true);
   }, [monthlyIncome]);
-
-  // 🔥 DWIJ'S NEW: The Master Alert Function (Fires Android Push + Updates Bell Icon)
-  const dispatchAlert = async (title, message) => {
-    await syncNotification(Date.now(), title, message, (newAlert) => {
-      // We tag it as 'isDynamic' so it doesn't get erased by static analysis
-      const finalAlert = { ...newAlert, isDynamic: true };
-      setInsights(prev => [finalAlert, ...prev]);
-    });
-  };
 
   const runAnalysis = (currentExpenses, income) => {
     const safeIncome = income || monthlyIncome;
@@ -72,14 +111,10 @@ export function ExpenseProvider({ children }) {
     
     const newInsights = generateSmartInsights(currentExpenses, totals);
     
-    // 🔥 DWIJ'S FIX: Merge the new static insights with dynamic Android alerts
-    setInsights(prev => {
-      const dynamicAlerts = prev.filter(p => p.isDynamic);
-      return [...dynamicAlerts, ...newInsights];
-    });
+    // 🔥 Reverted to standard so your insights panel acts normal
+    setInsights(newInsights);
   };
 
-  // YOUR PROTECTED SALARY LOGIC
   const handleSalarySubmit = (income) => {
     const strictInt = Math.floor(Number(income)); 
     setMonthlyIncome(strictInt);
@@ -92,25 +127,59 @@ export function ExpenseProvider({ children }) {
       newExpense.category = categorizeTransaction(newExpense.description);
     }
     
+    let savedSuccessfully = false;
     const db = getDB();
+
     if (db) {
       try {
         const query = `INSERT OR IGNORE INTO transactions (amount, merchant, date, category, type, unique_hash) VALUES (?, ?, ?, ?, ?, ?)`;
         const hash = `${newExpense.description}-${newExpense.amount}-${newExpense.date}`; 
         await db.run(query, [newExpense.amount, newExpense.description, newExpense.date, newExpense.category, 'debit', hash]);
+        
         await loadData(); 
+        savedSuccessfully = true;
       } catch (err) {
-        console.error("SQLite Insert Error:", err);
+        console.error("🚨 SQLite Insert Error:", err);
       }
+    } else {
+      // 🔥 WEB BROWSER FALLBACK: 
+      // SQLite doesn't work on 'npm start'. This ensures your UI still updates locally!
+      const fallbackExpense = {
+        id: Date.now(),
+        amount: newExpense.amount,
+        description: newExpense.description,
+        date: newExpense.date,
+        category: newExpense.category,
+        type: 'debit',
+        time: 'day'
+      };
+      setExpenses(prev => [fallbackExpense, ...prev]);
+      runAnalysis([fallbackExpense, ...expenses], monthlyIncome);
+      savedSuccessfully = true;
     }
 
-    // 🔥 DWIJ'S NEW DAILY LEAK MONITOR 
-    const dailyLeakLimit = 500; 
-    const leakWarning = evaluateDailyLeaks(newExpense, expenses, dailyLeakLimit);
-    
-    if (leakWarning) {
-      const msg = typeof leakWarning === 'string' ? leakWarning : `You exceeded your ₹${dailyLeakLimit} daily limit!`;
-      dispatchAlert("Daily Leak Alert 🚨", msg);
+    // 🔥 NEW: Smart Monthly Budget Logic (Replaces the 500 Daily Limit)
+    if (savedSuccessfully && monthlyBudget > 0) {
+      const now = new Date();
+      
+      // Calculate what the month's total WAS before this new expense
+      let previousMonthTotal = 0;
+      expenses.forEach(exp => {
+        const expDate = new Date(exp.date);
+        if (expDate.getMonth() === now.getMonth() && expDate.getFullYear() === now.getFullYear()) {
+          previousMonthTotal += exp.amount;
+        }
+      });
+
+      const newMonthTotal = previousMonthTotal + newExpense.amount;
+
+      // The Boundary Check: Only fire if THIS specific transaction pushed them over the limit!
+      if (previousMonthTotal <= monthlyBudget && newMonthTotal > monthlyBudget) {
+        dispatchAlert(
+          "Budget Exceeded! 🚨", 
+          `You exceeded your ₹${monthlyBudget} monthly budget!`
+        );
+      }
     }
   };
 
@@ -147,11 +216,14 @@ export function ExpenseProvider({ children }) {
     <ExpenseContext.Provider value={{
       expenses, insights, setInsights, leakScore, monthlyIncome, activeTab, setActiveTab,
       showSalaryModal, setShowSalaryModal, upcomingSubscriptions,
+      notifications, setNotifications, deleteNotification,
+      monthlyBudget, handleBudgetChange, // 🔥 Exported here!
       handleSalarySubmit, handleAddExpense, handleDeleteExpense, handleAddMultipleExpenses, 
-      dispatchAlert // 🔥 Exported for UI use
+      dispatchAlert 
     }}>
       {children}
     </ExpenseContext.Provider>
+    
   );
 }
 

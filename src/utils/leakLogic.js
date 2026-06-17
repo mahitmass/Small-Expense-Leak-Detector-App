@@ -290,3 +290,34 @@ export const evaluateDailyLeaks = (newTransaction, todayExpenses, dailyLimit) =>
 
     return newTotal;
 };
+export const calculateMonthlySavings = (expenses) => {
+  const now = new Date();
+  const currentMonth = now.getMonth(); 
+  const currentYear = now.getFullYear();
+
+  // Handle January edge case (prev month is Dec of last year)
+  const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+  const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+
+  let thisMonthTotal = 0;
+  let lastMonthTotal = 0;
+
+  expenses.forEach(exp => {
+    const expDate = new Date(exp.date);
+    if (expDate.getMonth() === currentMonth && expDate.getFullYear() === currentYear) {
+      thisMonthTotal += exp.amount;
+    } else if (expDate.getMonth() === prevMonth && expDate.getFullYear() === prevYear) {
+      lastMonthTotal += exp.amount;
+    }
+  });
+
+  const savings = lastMonthTotal - thisMonthTotal;
+
+  return {
+    thisMonthTotal,
+    lastMonthTotal,
+    savings,
+    // Only return true if you actually saved money
+    hasSavings: savings > 0 && lastMonthTotal > 0 
+  };
+};

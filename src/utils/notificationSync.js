@@ -1,42 +1,44 @@
-/* src/utils/notificationSync.js */
 import { LocalNotifications } from '@capacitor/local-notifications';
 
 export const syncNotification = async (id, title, message, addInsightToContext) => {
-  // 1. Send it to the React App UI (Top Right Bell Icon)
+  // 1. ALWAYS UPDATE THE UI BELL ICON FIRST (Fail-safe)
   const newInsight = {
     id: id || Date.now(),
     title: title,
     message: message,
     timestamp: new Date().toISOString(),
-    isRead: false
+    isRead: false,
+    isDynamic: true // Tagged so your context knows not to delete it
   };
   
-  // Call the function from your ExpenseContext to update the React Bell Icon
   if (addInsightToContext) {
     addInsightToContext(newInsight);
   }
 
-  // 2. Send the exact same data to the Android System Tray
+  // 2. ATTEMPT ANDROID SYSTEM NOTIFICATION
   try {
-    // Request permission (Required for Android 13+)
     const permStatus = await LocalNotifications.checkPermissions();
+    
     if (permStatus.display !== 'granted') {
-      await LocalNotifications.requestPermissions();
+      const request = await LocalNotifications.requestPermissions();
+      if (request.display !== 'granted') {
+        console.warn("User denied Android notification permissions.");
+        return; // UI bell is already updated!
+      }
     }
 
-    // Fire the Android Notification
     await LocalNotifications.schedule({
       notifications: [
         {
           title: title,
           body: message,
-          id: newInsight.id, 
-          schedule: { at: new Date(Date.now() + 1000) }
-          // 🔥 REMOVED smallIcon: It causes silent failures if the icon doesn't exist in Android Studio!
+          id: parseInt(id.toString().substring(0, 8)), // Android requires a short INT ID
+          schedule: { at: new Date(Date.now() + 1000) }, 
+          smallIcon: 'ic_stat_icon_config_sample', 
         }
       ]
     });
   } catch (error) {
-    console.error("Android Notification Failed:", error);
+    console.error("Capacitor Native Notification Skipped (Normal if testing on web):", error);
   }
 };
